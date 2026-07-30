@@ -1,0 +1,11 @@
+﻿.env
+*.env
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+data/cache/
+*.sqlite
+*.db
+models/
+*.gguf
