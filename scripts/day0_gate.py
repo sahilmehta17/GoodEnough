@@ -50,7 +50,7 @@ PLANNED_DEV_ITEMS = 150
 
 MCQ_SUFFIX = (
     'Please show your choice in the answer field with only the choice letter, '
-    'e.g., "answer": "C". /no_think'
+    'e.g., "answer": "C".'
 )
 
 # MMLU-shaped probes. Deliberately varied in length.
@@ -65,10 +65,31 @@ PROBES = [
 LOCAL_SAMPLING = {
     "temperature": 0.7,
     "top_p": 0.8,
+    "top_k": 20,
+    "min_p": 0,
     "presence_penalty": 1.5,
     "seed": SEED,
     "max_tokens": 64,
 }
+
+HOSTED_SAMPLING = {
+    "temperature": 0.7,
+    "top_p": 0.8,
+    "seed": SEED,
+    "max_completion_tokens": 64,
+}
+
+
+def load_dotenv(path=".env"):
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
 def post(url, payload, headers=None, timeout=180):
@@ -88,8 +109,25 @@ def post(url, payload, headers=None, timeout=180):
         return time.perf_counter() - t0, 0, {}, {"error": repr(e)}
 
 
-def build_msgs(probe):
+def build_messages(probe):
     return [{"role": "user", "content": f"{probe}\n\n{MCQ_SUFFIX}"}]
+
+
+def build_payload(probe, provider):
+    if provider == "local":
+        return {
+            "model": "local",
+            "messages": build_messages(probe),
+            **LOCAL_SAMPLING,
+            "chat_template_kwargs": {"enable_thinking": False},
+        }
+    if provider == "hosted":
+        return {
+            "model": GROQ_MODEL,
+            "messages": build_messages(probe),
+            **HOSTED_SAMPLING,
+        }
+    raise ValueError(f"unknown provider: {provider}")
 
 
 # ---------------------------------------------------------------- check A
@@ -103,12 +141,12 @@ def check_local(n_calls):
 
     print(f"  warm-up (3 calls, discarded)")
     for i in range(3):
-        post(LOCAL_URL, {"model": "local", "messages": build_msgs(PROBES[i % len(PROBES)]), **LOCAL_SAMPLING})
+        post(LOCAL_URL, build_payload(PROBES[i % len(PROBES)], "local"))
 
     print(f"  measuring {n_calls} calls")
     for i in range(n_calls):
         probe = PROBES[i % len(PROBES)]
-        lat, status, _, data = post(LOCAL_URL, {"model": "local", "messages": build_msgs(probe), **LOCAL_SAMPLING})
+        lat, status, _, data = post(LOCAL_URL, build_payload(probe, "local"))
         if status != 200 or "choices" not in data:
             failures += 1
             print(f"    [{i+1}] FAIL status={status} {str(data)[:120]}")
@@ -166,8 +204,7 @@ def check_hosted(n_calls, api_key):
 
     for i in range(n_calls):
         probe = PROBES[i % len(PROBES)]
-        payload = {"model": GROQ_MODEL, "messages": build_msgs(probe),
-                   "temperature": 0.0, "max_tokens": 64, "seed": SEED}
+        payload = build_payload(probe, "hosted")
         lat, status, hdrs, data = post(GROQ_URL, payload, headers)
 
         if status == 429:
@@ -260,6 +297,7 @@ def check_budget(hosted):
 # ---------------------------------------------------------------- main
 
 def main():
+    load_dotenv()
     ap = argparse.ArgumentParser()
     ap.add_argument("--local-calls", type=int, default=20)
     ap.add_argument("--hosted-calls", type=int, default=20)
