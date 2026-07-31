@@ -33,6 +33,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
 
 LOCAL_URL = "http://localhost:8080/v1/chat/completions"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -44,10 +46,11 @@ GROQ_TPD = 100_000
 GROQ_RPD = 1_000
 GROQ_RPM = 30
 
-# Planned run: 8 slices x 100 MMLU + 150 GSM8K + ~150 dev items.
+# Planned run: 8 slices x 100 MMLU + 150 GSM8K + ~150 dev + 150 router items.
 PLANNED_MMLU_ITEMS = 800
 PLANNED_GSM8K_ITEMS = 150
 PLANNED_DEV_ITEMS = 150
+PLANNED_ROUTER_ITEMS = 150
 
 MCQ_SUFFIX = (
     'Please show your choice in the answer field with only the choice letter, '
@@ -168,6 +171,31 @@ def wait_for_local(
     raise TimeoutError(f"local model did not become ready: {last_error!r}")
 
 
+def summarize_calls(calls):
+    latencies = [call["latency_seconds"] for call in calls]
+    mean_output = statistics.mean(call["output_tokens"] for call in calls)
+    median_latency = statistics.median(latencies)
+    return {
+        "successful_calls": len(calls),
+        "median_e2e_latency_seconds": median_latency,
+        "mean_input_tokens": statistics.mean(
+            call["input_tokens"] for call in calls
+        ),
+        "mean_output_tokens": mean_output,
+        "e2e_output_tokens_per_second": mean_output / median_latency,
+    }
+
+
+def write_json_atomic(path, value):
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    os.replace(temporary, destination)
+
+
 # ---------------------------------------------------------------- check A
 
 def check_local(n_calls):
@@ -178,7 +206,13 @@ def check_local(n_calls):
     print("  waiting for local /health")
     wait_for_local()
 
-    lats, out_toks, in_toks, failures = [], [], [], 0
+    try:
+        props = get_json("http://localhost:8080/props")
+    except Exception as exc:
+        props = {"error": repr(exc)}
+
+    calls = []
+    failures = 0
 
     print(f"  warm-up (3 calls, discarded)")
     for i in range(3):
@@ -198,40 +232,58 @@ def check_local(n_calls):
             failures += 1
             print(f"    [{i+1}] FAIL unparseable content={txt!r}")
             continue
-        lats.append(lat)
         u = data.get("usage", {})
-        in_toks.append(u.get("prompt_tokens", 0))
-        out_toks.append(u.get("completion_tokens", 0))
+        calls.append(
+            {
+                "latency_seconds": lat,
+                "input_tokens": u.get("prompt_tokens", 0),
+                "output_tokens": u.get("completion_tokens", 0),
+            }
+        )
         if i == 0:
             print(f"    sample response: {txt[:160]!r}")
         sys.stdout.write(f"\r    {i+1}/{n_calls}  last={lat:.2f}s")
         sys.stdout.flush()
     print()
 
-    if not lats:
+    if not calls:
         print("  RESULT: FAIL. No successful local calls. Is llama-server running on :8080?")
-        return None
+        return {
+            "status": "fail",
+            "failures": failures,
+            "requested_calls": n_calls,
+            "props": props,
+        }
 
-    med = statistics.median(lats)
-    mean_out = statistics.mean(out_toks) if out_toks else 0
-    tps = mean_out / med if med else 0
-    total_items = PLANNED_MMLU_ITEMS + PLANNED_GSM8K_ITEMS + PLANNED_DEV_ITEMS
-    est_hours = med * total_items / 3600
+    summary = summarize_calls(calls)
+    total_items = (
+        PLANNED_MMLU_ITEMS
+        + PLANNED_GSM8K_ITEMS
+        + PLANNED_DEV_ITEMS
+        + PLANNED_ROUTER_ITEMS
+    )
+    est_hours = summary["median_e2e_latency_seconds"] * total_items / 3600
+    status = "warn" if est_hours > 4 else "pass"
 
     print(f"\n  failures:            {failures}/{n_calls}")
-    print(f"  median latency:      {med:.2f}s")
-    print(f"  mean input tokens:   {statistics.mean(in_toks):.0f}")
-    print(f"  mean output tokens:  {mean_out:.0f}")
-    print(f"  generation tok/s:    {tps:.1f}")
+    print(f"  median latency:      {summary['median_e2e_latency_seconds']:.2f}s")
+    print(f"  mean input tokens:   {summary['mean_input_tokens']:.0f}")
+    print(f"  mean output tokens:  {summary['mean_output_tokens']:.0f}")
+    print(f"  end-to-end output tok/s: {summary['e2e_output_tokens_per_second']:.1f}")
     print(f"  est. full pass:      {est_hours:.1f}h for {total_items} items")
 
-    if est_hours > 4:
+    if status == "warn":
         print(f"\n  RESULT: WARN. Full pass exceeds 4h. Cut to 6 slices BEFORE starting.")
     else:
         print(f"\n  RESULT: PASS.")
-    return {"median_latency": med, "tps": tps, "est_hours": est_hours,
-            "mean_in": statistics.mean(in_toks), "mean_out": mean_out}
-
+    return {
+        **summary,
+        "status": status,
+        "failures": failures,
+        "requested_calls": n_calls,
+        "est_hours": est_hours,
+        "props": props,
+    }
 
 # ---------------------------------------------------------------- check B
 
@@ -241,7 +293,7 @@ def check_hosted(n_calls, api_key):
     print("=" * 68)
 
     headers = {"Authorization": f"Bearer {api_key}"}
-    lats, in_toks, out_toks = [], [], []
+    calls = []
     failures, rate_limited = 0, 0
     last_headers, model_returned, seed_ok = {}, None, None
 
@@ -267,10 +319,14 @@ def check_hosted(n_calls, api_key):
             continue
 
         last_headers = hdrs
-        lats.append(lat)
         u = data.get("usage", {})
-        in_toks.append(u.get("prompt_tokens", 0))
-        out_toks.append(u.get("completion_tokens", 0))
+        calls.append(
+            {
+                "latency_seconds": lat,
+                "input_tokens": u.get("prompt_tokens", 0),
+                "output_tokens": u.get("completion_tokens", 0),
+            }
+        )
         if model_returned is None:
             model_returned = data.get("model")
             seed_ok = "seed" in str(data.get("system_fingerprint", "")) or True
@@ -280,30 +336,52 @@ def check_hosted(n_calls, api_key):
         time.sleep(interval)
     print()
 
-    if not lats:
+    if not calls:
         print("  RESULT: FAIL. No successful hosted calls.")
-        return None
+        return {
+            "status": "fail",
+            "failures": failures,
+            "rate_limited": rate_limited,
+            "requested_calls": n_calls,
+            "model_requested": GROQ_MODEL,
+        }
+
+    summary = summarize_calls(calls)
+    status = "pass" if failures == 0 else "warn"
+    rate_limit_headers = {
+        k: last_headers[k]
+        for k in sorted(last_headers)
+        if k.lower().startswith("x-ratelimit")
+    }
 
     print(f"\n  failures:            {failures}")
     print(f"  rate limited:        {rate_limited}")
-    print(f"  median latency:      {statistics.median(lats):.2f}s")
-    print(f"  mean input tokens:   {statistics.mean(in_toks):.0f}")
-    print(f"  mean output tokens:  {statistics.mean(out_toks):.0f}")
+    print(f"  median latency:      {summary['median_e2e_latency_seconds']:.2f}s")
+    print(f"  mean input tokens:   {summary['mean_input_tokens']:.0f}")
+    print(f"  mean output tokens:  {summary['mean_output_tokens']:.0f}")
     print(f"  model requested:     {GROQ_MODEL}")
     print(f"  model returned:      {model_returned}")
     if model_returned != GROQ_MODEL:
         print("    WARN: returned model id differs from requested. Record this in the manifest.")
 
     print("\n  rate limit headers:")
-    for k in sorted(last_headers):
-        if k.lower().startswith("x-ratelimit"):
-            print(f"    {k}: {last_headers[k]}")
+    for k, value in rate_limit_headers.items():
+        print(f"    {k}: {value}")
 
     print("\n  ACTION: confirm `seed` reproducibility manually by rerunning one prompt twice")
     print("          and diffing the output. Record yes/no in PREREGISTRATION.md.")
-    print("\n  RESULT: PASS." if failures == 0 else "\n  RESULT: WARN, see failures above.")
-    return {"median_latency": statistics.median(lats),
-            "mean_in": statistics.mean(in_toks), "mean_out": statistics.mean(out_toks)}
+    print("\n  RESULT: PASS." if status == "pass" else "\n  RESULT: WARN, see failures above.")
+    return {
+        **summary,
+        "status": status,
+        "failures": failures,
+        "rate_limited": rate_limited,
+        "requested_calls": n_calls,
+        "model_requested": GROQ_MODEL,
+        "model_returned": model_returned,
+        "rate_limit_headers": rate_limit_headers,
+        "seed_ok": seed_ok,
+    }
 
 
 # ---------------------------------------------------------------- check C
@@ -313,31 +391,57 @@ def check_budget(hosted):
     print("CHECK C: token budget")
     print("=" * 68)
 
-    if hosted:
-        mmlu_per = hosted["mean_in"] + hosted["mean_out"]
+    if hosted and hosted.get("status") in ("pass", "warn"):
+        mmlu_per = hosted["mean_input_tokens"] + hosted["mean_output_tokens"]
     else:
         mmlu_per = 220
         print("  (hosted skipped, using 220 tok/item estimate)")
 
+    planned_mcq = PLANNED_MMLU_ITEMS + PLANNED_DEV_ITEMS + PLANNED_ROUTER_ITEMS
     gsm_per = mmlu_per + 300  # step-by-step output
-    mmlu_tok = (PLANNED_MMLU_ITEMS + PLANNED_DEV_ITEMS) * mmlu_per
+    mmlu_tok = planned_mcq * mmlu_per
     gsm_tok = PLANNED_GSM8K_ITEMS * gsm_per
     total = mmlu_tok + gsm_tok
     days = total / GROQ_TPD
-    req_days = (PLANNED_MMLU_ITEMS + PLANNED_DEV_ITEMS + PLANNED_GSM8K_ITEMS) / GROQ_RPD
+    req_days = (planned_mcq + PLANNED_GSM8K_ITEMS) / GROQ_RPD
+    binding = "tokens per day" if days > req_days else "requests per day"
+    status = "warn" if days > 5 else "pass"
 
-    print(f"  MMLU + dev:          {PLANNED_MMLU_ITEMS + PLANNED_DEV_ITEMS} items x {mmlu_per:.0f} tok = {mmlu_tok:,.0f}")
+    print(
+        f"  MMLU + dev + router: {planned_mcq} items x {mmlu_per:.0f} tok = {mmlu_tok:,.0f}"
+    )
     print(f"  GSM8K:               {PLANNED_GSM8K_ITEMS} items x {gsm_per:.0f} tok = {gsm_tok:,.0f}")
     print(f"  TOTAL:               {total:,.0f} tokens")
     print(f"\n  Groq TPD ceiling:    {GROQ_TPD:,}")
     print(f"  days (token-bound):  {days:.1f}")
     print(f"  days (request-bound):{req_days:.1f}")
-    print(f"\n  BINDING CONSTRAINT:  {'tokens per day' if days > req_days else 'requests per day'}")
+    print(f"\n  BINDING CONSTRAINT:  {binding}")
     print(f"\n  => the runner MUST be resumable across {max(1, int(days) + 1)} days.")
-    if days > 5:
+    if status == "warn":
         print("\n  RESULT: WARN. Over 5 days. Cut to 6 slices.")
     else:
         print("\n  RESULT: PASS.")
+    return {
+        "status": status,
+        "mmlu_tokens_per_item": mmlu_per,
+        "planned_mcq_items": planned_mcq,
+        "planned_router_items": PLANNED_ROUTER_ITEMS,
+        "total_tokens": total,
+        "token_bound_days": days,
+        "request_bound_days": req_days,
+        "binding": binding,
+    }
+
+
+def overall_status(local, hosted, budget):
+    statuses = [local.get("status"), budget.get("status")]
+    if hosted.get("status") not in ("skipped", None):
+        statuses.append(hosted.get("status"))
+    if "fail" in statuses:
+        return "fail"
+    if "warn" in statuses:
+        return "warn"
+    return "pass"
 
 
 # ---------------------------------------------------------------- main
@@ -348,6 +452,13 @@ def main():
     ap.add_argument("--local-calls", type=int, default=20)
     ap.add_argument("--hosted-calls", type=int, default=20)
     ap.add_argument("--skip-hosted", action="store_true")
+    ap.add_argument("--output", help="write a machine-readable Day 0 JSON report")
+    ap.add_argument(
+        "--thread-count",
+        type=int,
+        default=None,
+        help="llama.cpp thread count used for this run",
+    )
     args = ap.parse_args()
 
     print("goodenough :: Day 0 gate")
@@ -355,15 +466,28 @@ def main():
 
     local = check_local(args.local_calls)
 
-    hosted = None
+    hosted = {"status": "skipped", "reason": "skip-hosted"}
     if not args.skip_hosted:
         key = os.environ.get("GROQ_API_KEY")
         if not key:
             print("\nCHECK B: SKIPPED. GROQ_API_KEY not set.")
+            hosted = {"status": "skipped", "reason": "GROQ_API_KEY not set"}
         else:
             hosted = check_hosted(args.hosted_calls, key)
 
-    check_budget(hosted)
+    budget = check_budget(hosted)
+    report = {
+        "schema_version": 1,
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "thread_count": args.thread_count,
+        "local": local,
+        "hosted": hosted,
+        "budget": budget,
+        "status": overall_status(local, hosted, budget),
+    }
+    if args.output:
+        write_json_atomic(args.output, report)
+        print(f"\n  wrote report: {args.output}")
 
     print("\n" + "=" * 68)
     print("NEXT")

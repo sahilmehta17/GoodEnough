@@ -1,4 +1,7 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock
 
 from scripts import day0_gate
@@ -65,6 +68,27 @@ class GateValidationTests(unittest.TestCase):
         )
         self.assertEqual(result, {"status": "ok"})
         self.assertEqual(get_fn.call_count, 3)
+
+
+class ArtifactTests(unittest.TestCase):
+    def test_summary_labels_end_to_end_throughput_honestly(self):
+        summary = day0_gate.summarize_calls(
+            [
+                {"latency_seconds": 2.0, "input_tokens": 60, "output_tokens": 8},
+                {"latency_seconds": 1.0, "input_tokens": 80, "output_tokens": 10},
+            ]
+        )
+        self.assertEqual(summary["median_e2e_latency_seconds"], 1.5)
+        self.assertEqual(summary["mean_output_tokens"], 9)
+        self.assertEqual(summary["e2e_output_tokens_per_second"], 6)
+        self.assertNotIn("generation_tokens_per_second", summary)
+
+    def test_atomic_writer_creates_readable_json(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "result.json"
+            day0_gate.write_json_atomic(path, {"status": "pass"})
+            self.assertEqual(json.loads(path.read_text()), {"status": "pass"})
+            self.assertFalse(path.with_suffix(".json.tmp").exists())
 
 
 if __name__ == "__main__":
