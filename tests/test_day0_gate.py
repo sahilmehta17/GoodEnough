@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock
 
 from scripts import day0_gate
 
@@ -36,6 +37,34 @@ class RequestContractTests(unittest.TestCase):
             "chat_template_kwargs",
         ):
             self.assertNotIn(unsupported, payload)
+
+
+class GateValidationTests(unittest.TestCase):
+    def test_extracts_documented_answer_forms(self):
+        self.assertEqual(day0_gate.extract_mcq_answer("answer: C"), "C")
+        self.assertEqual(day0_gate.extract_mcq_answer('{"answer": "b"}'), "B")
+        self.assertEqual(day0_gate.extract_mcq_answer('Answer : "D"'), "D")
+
+    def test_rejects_empty_reasoning_only_and_unrelated_text(self):
+        self.assertIsNone(day0_gate.extract_mcq_answer(""))
+        self.assertIsNone(day0_gate.extract_mcq_answer("I considered every option"))
+
+    def test_wait_for_local_survives_loading_then_returns_health(self):
+        get_fn = Mock(
+            side_effect=[
+                RuntimeError("connection refused"),
+                {"status": "loading"},
+                {"status": "ok"},
+            ]
+        )
+        result = day0_gate.wait_for_local(
+            timeout=5,
+            poll_interval=0,
+            get_fn=get_fn,
+            sleep_fn=lambda _: None,
+        )
+        self.assertEqual(result, {"status": "ok"})
+        self.assertEqual(get_fn.call_count, 3)
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ Usage
 import argparse
 import json
 import os
+import re
 import statistics
 import sys
 import time
@@ -130,12 +131,52 @@ def build_payload(probe, provider):
     raise ValueError(f"unknown provider: {provider}")
 
 
+ANSWER_RE = re.compile(
+    r'\banswer\s*["\']?\s*:\s*["\']?\s*([A-D])\b', re.IGNORECASE
+)
+
+
+def extract_mcq_answer(text):
+    if not isinstance(text, str):
+        return None
+    match = ANSWER_RE.search(text)
+    return match.group(1).upper() if match else None
+
+
+def get_json(url, timeout=5):
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def wait_for_local(
+    timeout=180,
+    poll_interval=1,
+    get_fn=None,
+    sleep_fn=time.sleep,
+):
+    get_fn = get_fn or (lambda: get_json("http://localhost:8080/health"))
+    deadline = time.monotonic() + timeout
+    last_error = None
+    while time.monotonic() < deadline:
+        try:
+            health = get_fn()
+            if health.get("status") == "ok":
+                return health
+        except Exception as exc:
+            last_error = exc
+        sleep_fn(poll_interval)
+    raise TimeoutError(f"local model did not become ready: {last_error!r}")
+
+
 # ---------------------------------------------------------------- check A
 
 def check_local(n_calls):
     print("\n" + "=" * 68)
     print("CHECK A: local throughput")
     print("=" * 68)
+
+    print("  waiting for local /health")
+    wait_for_local()
 
     lats, out_toks, in_toks, failures = [], [], [], 0
 
@@ -151,12 +192,17 @@ def check_local(n_calls):
             failures += 1
             print(f"    [{i+1}] FAIL status={status} {str(data)[:120]}")
             continue
+        message = data["choices"][0].get("message", {})
+        txt = message.get("content")
+        if not extract_mcq_answer(txt):
+            failures += 1
+            print(f"    [{i+1}] FAIL unparseable content={txt!r}")
+            continue
         lats.append(lat)
         u = data.get("usage", {})
         in_toks.append(u.get("prompt_tokens", 0))
         out_toks.append(u.get("completion_tokens", 0))
         if i == 0:
-            txt = data["choices"][0]["message"]["content"]
             print(f"    sample response: {txt[:160]!r}")
         sys.stdout.write(f"\r    {i+1}/{n_calls}  last={lat:.2f}s")
         sys.stdout.flush()
