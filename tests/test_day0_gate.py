@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from scripts import day0_gate
 
@@ -89,6 +89,34 @@ class ArtifactTests(unittest.TestCase):
             day0_gate.write_json_atomic(path, {"status": "pass"})
             self.assertEqual(json.loads(path.read_text()), {"status": "pass"})
             self.assertFalse(path.with_suffix(".json.tmp").exists())
+
+    def test_local_failures_prevent_overall_pass(self):
+        success = (
+            0.1,
+            200,
+            {},
+            {
+                "choices": [{"message": {"content": "answer: C"}}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 4},
+            },
+        )
+        failure = (0.1, 500, {}, {"error": "boom"})
+        # 3 warm-ups + 2 measured calls: one success, one failure.
+        posts = [success, success, success, success, failure]
+        with (
+            patch.object(day0_gate, "wait_for_local", return_value={"status": "ok"}),
+            patch.object(day0_gate, "get_json", return_value={}),
+            patch.object(day0_gate, "post", side_effect=posts),
+        ):
+            local = day0_gate.check_local(2)
+        self.assertEqual(local["failures"], 1)
+        self.assertEqual(local["status"], "warn")
+        self.assertEqual(
+            day0_gate.overall_status(
+                local, {"status": "skipped"}, {"status": "pass"}
+            ),
+            "warn",
+        )
 
 
 if __name__ == "__main__":

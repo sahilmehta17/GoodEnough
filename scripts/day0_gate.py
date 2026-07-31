@@ -263,7 +263,7 @@ def check_local(n_calls):
         + PLANNED_ROUTER_ITEMS
     )
     est_hours = summary["median_e2e_latency_seconds"] * total_items / 3600
-    status = "warn" if est_hours > 4 else "pass"
+    status = "warn" if failures > 0 or est_hours > 4 else "pass"
 
     print(f"\n  failures:            {failures}/{n_calls}")
     print(f"  median latency:      {summary['median_e2e_latency_seconds']:.2f}s")
@@ -273,7 +273,12 @@ def check_local(n_calls):
     print(f"  est. full pass:      {est_hours:.1f}h for {total_items} items")
 
     if status == "warn":
-        print(f"\n  RESULT: WARN. Full pass exceeds 4h. Cut to 6 slices BEFORE starting.")
+        if failures > 0:
+            print(f"\n  RESULT: WARN. {failures} failed or unparseable call(s).")
+        else:
+            print(
+                "\n  RESULT: WARN. Full pass exceeds 4h. Cut to 6 slices BEFORE starting."
+            )
     else:
         print(f"\n  RESULT: PASS.")
     return {
