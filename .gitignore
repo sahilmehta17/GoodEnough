@@ -6,6 +6,8 @@ __pycache__/
 node_modules/
 data/cache/
 *.sqlite
+*.sqlite-wal
+*.sqlite-shm
 *.db
 models/
 *.gguf

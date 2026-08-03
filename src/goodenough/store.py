@@ -70,7 +70,12 @@ class ResultRow:
 
 
 def connect(db_path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    # timeout + WAL let a local and a hosted runner write concurrently without
+    # tripping "database is locked". WAL allows one writer plus readers and
+    # serializes the two writers with short waits rather than errors.
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.executescript(SCHEMA)
     conn.commit()
     return conn
