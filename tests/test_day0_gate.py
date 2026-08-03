@@ -119,5 +119,31 @@ class ArtifactTests(unittest.TestCase):
         )
 
 
+class HostedReliabilityTests(unittest.TestCase):
+    def test_rate_limit_retries_the_same_payload(self):
+        calls = []
+
+        def post_fn(url, payload, headers, timeout=180):
+            calls.append(payload)
+            if len(calls) == 1:
+                return 0.1, 429, {"retry-after": "0"}, {"error": "limited"}
+            return 0.2, 200, {}, {
+                "model": day0_gate.GROQ_MODEL,
+                "choices": [{"message": {"content": "answer: C"}}],
+                "usage": {"prompt_tokens": 20, "completion_tokens": 4},
+                "system_fingerprint": "fp_1",
+            }
+
+        result = day0_gate.post_with_retry(
+            day0_gate.GROQ_URL,
+            {"item": "same"},
+            {"Authorization": "Bearer test"},
+            post_fn=post_fn,
+            sleep_fn=lambda _: None,
+        )
+        self.assertEqual(result[1], 200)
+        self.assertEqual(calls, [{"item": "same"}, {"item": "same"}])
+
+
 if __name__ == "__main__":
     unittest.main()

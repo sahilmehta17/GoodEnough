@@ -96,6 +96,9 @@ def load_dotenv(path=".env"):
             os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
+TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
+
+
 def post(url, payload, headers=None, timeout=180):
     body = json.dumps(payload).encode()
     hdrs = {"Content-Type": "application/json"}
@@ -111,6 +114,26 @@ def post(url, payload, headers=None, timeout=180):
         return time.perf_counter() - t0, e.code, dict(e.headers), {"error": e.read().decode()[:400]}
     except Exception as e:
         return time.perf_counter() - t0, 0, {}, {"error": repr(e)}
+
+
+def post_with_retry(
+    url,
+    payload,
+    headers,
+    max_attempts=3,
+    post_fn=post,
+    sleep_fn=time.sleep,
+):
+    result = None
+    for attempt in range(max_attempts):
+        result = post_fn(url, payload, headers)
+        _, status, response_headers, _ = result
+        if status not in TRANSIENT_STATUSES:
+            return result
+        if attempt + 1 < max_attempts:
+            delay = float(response_headers.get("retry-after", 2 ** attempt))
+            sleep_fn(delay)
+    return result
 
 
 def build_messages(probe):
@@ -292,6 +315,14 @@ def check_local(n_calls):
 
 # ---------------------------------------------------------------- check B
 
+def _hosted_message_content(data):
+    choices = data.get("choices") or []
+    if not choices:
+        return None
+    message = choices[0].get("message") or {}
+    return message.get("content")
+
+
 def check_hosted(n_calls, api_key):
     print("\n" + "=" * 68)
     print("CHECK B: hosted acceptance")
@@ -300,7 +331,8 @@ def check_hosted(n_calls, api_key):
     headers = {"Authorization": f"Bearer {api_key}"}
     calls = []
     failures, rate_limited = 0, 0
-    last_headers, model_returned, seed_ok = {}, None, None
+    last_headers, model_returned = {}, None
+    repeatability = None
 
     interval = 60.0 / GROQ_RPM + 0.15
     print(f"  {n_calls} calls, pacing at {interval:.2f}s to stay under {GROQ_RPM} RPM")
@@ -308,37 +340,62 @@ def check_hosted(n_calls, api_key):
     for i in range(n_calls):
         probe = PROBES[i % len(PROBES)]
         payload = build_payload(probe, "hosted")
-        lat, status, hdrs, data = post(GROQ_URL, payload, headers)
+        attempts = 2 if i == 0 else 1
+        attempt_results = []
+        for _ in range(attempts):
+            attempt_results.append(
+                post_with_retry(GROQ_URL, payload, headers)
+            )
+            time.sleep(interval)
 
-        if status == 429:
-            rate_limited += 1
-            print(f"\n    [{i+1}] 429 rate limited. retry-after={hdrs.get('retry-after')}")
-            time.sleep(float(hdrs.get("retry-after", 5)))
-            continue
-        if status != 200 or "choices" not in data:
-            failures += 1
-            print(f"\n    [{i+1}] FAIL status={status} {str(data)[:200]}")
+        if i == 0 and len(attempt_results) == 2:
+            first_data = attempt_results[0][3]
+            second_data = attempt_results[1][3]
+            first_content = _hosted_message_content(first_data)
+            second_content = _hosted_message_content(second_data)
+            repeatability = {
+                "same_content": first_content == second_content,
+                "first_system_fingerprint": first_data.get("system_fingerprint"),
+                "second_system_fingerprint": second_data.get("system_fingerprint"),
+            }
+            print(
+                f"\n    repeatability: same_content={repeatability['same_content']} "
+                f"fp=({repeatability['first_system_fingerprint']!r}, "
+                f"{repeatability['second_system_fingerprint']!r})"
+            )
+
+        abort = False
+        for lat, status, hdrs, data in attempt_results:
+            if status == 429:
+                rate_limited += 1
+                failures += 1
+                print(f"\n    [{i+1}] 429 after retries")
+            elif status != 200 or "choices" not in data:
+                failures += 1
+                print(f"\n    [{i+1}] FAIL status={status} {str(data)[:200]}")
+            else:
+                last_headers = hdrs
+                u = data.get("usage", {})
+                calls.append(
+                    {
+                        "latency_seconds": lat,
+                        "input_tokens": u.get("prompt_tokens", 0),
+                        "output_tokens": u.get("completion_tokens", 0),
+                    }
+                )
+                if model_returned is None:
+                    model_returned = data.get("model")
+                    content = _hosted_message_content(data) or ""
+                    print(f"\n    sample: {content[:120]!r}")
+                sys.stdout.write(f"\r    {i+1}/{n_calls}  last={lat:.2f}s")
+                sys.stdout.flush()
+
             if failures >= 3:
                 print("  aborting after 3 failures")
+                abort = True
                 break
-            continue
-
-        last_headers = hdrs
-        u = data.get("usage", {})
-        calls.append(
-            {
-                "latency_seconds": lat,
-                "input_tokens": u.get("prompt_tokens", 0),
-                "output_tokens": u.get("completion_tokens", 0),
-            }
-        )
-        if model_returned is None:
-            model_returned = data.get("model")
-            seed_ok = "seed" in str(data.get("system_fingerprint", "")) or True
-            print(f"\n    sample: {data['choices'][0]['message']['content'][:120]!r}")
-        sys.stdout.write(f"\r    {i+1}/{n_calls}  last={lat:.2f}s")
-        sys.stdout.flush()
-        time.sleep(interval)
+        if abort:
+            break
     print()
 
     if not calls:
@@ -349,6 +406,7 @@ def check_hosted(n_calls, api_key):
             "rate_limited": rate_limited,
             "requested_calls": n_calls,
             "model_requested": GROQ_MODEL,
+            "repeatability": repeatability,
         }
 
     summary = summarize_calls(calls)
@@ -373,8 +431,7 @@ def check_hosted(n_calls, api_key):
     for k, value in rate_limit_headers.items():
         print(f"    {k}: {value}")
 
-    print("\n  ACTION: confirm `seed` reproducibility manually by rerunning one prompt twice")
-    print("          and diffing the output. Record yes/no in PREREGISTRATION.md.")
+    print("\n  repeatability evidence recorded; determinism is not required for PASS.")
     print("\n  RESULT: PASS." if status == "pass" else "\n  RESULT: WARN, see failures above.")
     return {
         **summary,
@@ -385,7 +442,7 @@ def check_hosted(n_calls, api_key):
         "model_requested": GROQ_MODEL,
         "model_returned": model_returned,
         "rate_limit_headers": rate_limit_headers,
-        "seed_ok": seed_ok,
+        "repeatability": repeatability,
     }
 
 

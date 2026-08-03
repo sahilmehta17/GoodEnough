@@ -74,29 +74,41 @@ Planned n from `n >= (1.645^2 * d) / delta^2` where `d` is discordance estimated
 
 ## 9. Pinned configuration
 
-**Local**
+**Local** (frozen on Day 0, 2026-07-31)
 ```
-model:          Qwen/Qwen3-1.7B-GGUF
-quantization:   Q8_0 (the only quantization the official repo publishes)
-file hash:      <fill on Day 0>
-runtime:        llama.cpp, commit <fill on Day 0>
-mode:           non-thinking (/no_think)
+model repo:     unsloth/Qwen3-1.7B-GGUF
+file:           Qwen3-1.7B-Q4_K_M.gguf
+quantization:   Q4_K_M
+size:           1.03 GiB
+sha256:         B139949C5BD74937AD8ED8C8CF3D9FFB1E99C866C823204DC42C0D91FA181897
+runtime:        llama.cpp build 10173 (e9fa0781f), Clang 20.1.8, Windows x86_64
+backend:        CPU (-ngl 0, no GPU offload)
+threads:        4 (-t 4; -t 8 measured, difference within noise on short outputs)
+slots:          1 (-np 1)
+chat template:  --jinja
+mode:           non-thinking, via request field chat_template_kwargs {"enable_thinking": false}
 sampling:       temperature 0.7, top_p 0.8, top_k 20, min_p 0, presence_penalty 1.5
-seed:           <fixed, fill on Day 0>
-max_tokens:     <fill on Day 0>
-hardware:       Intel Core Ultra 7 <exact model>, <threads>, <RAM>
+seed:           42
+max_tokens:     512 for multiple choice, 1024 for GSM8K
+hardware:       Intel Core Ultra 7 258V (Lunar Lake), 4 P-cores + 4 LP-E cores, 8 threads, no SMT, 32 GB LPDDR5X (on-package)
 ```
 
 Greedy decoding is not used. Qwen's model card states "DO NOT use greedy decoding" and recommends `presence_penalty 1.5` specifically for quantized models.
 
-**Hosted**
+**Configuration anomaly, recorded for reproducibility.** Qwen's official `Qwen/Qwen3-1.7B-GGUF` at Q8_0 (1.74 GiB) loaded cleanly on llama.cpp build 10173 but produced degenerate output (repeated `?` at temperature 0 on raw completion). Gemma-3-1b Q4_K_M and unsloth Qwen3-1.7B Q4_K_M both produced correct output on the same build. The official Q8_0 file was abandoned in favor of the unsloth Q4_K_M build above. Not root-caused. This was a pre-data change and required no amendment.
+
+**Hosted** (frozen on Day 0, 2026-07-31)
 ```
 provider:       Groq (free plan)
 model id:       llama-3.3-70b-versatile
-seed support:   <confirm on Day 0>
+non-thinking:   not applicable (not a reasoning model); no chat_template_kwargs sent
+seed support:   seed accepted by the API; determinism is best-effort, not guaranteed. Confirm empirically and record.
+free limits:    30 RPM, 1,000 RPD, 100,000 TPD (TPD is the binding constraint; full run spans ~3 days)
 ```
 
 Chosen over `openai/gpt-oss-120b` because reasoning tokens make that model's token budget unpredictable, and over `llama-3.1-8b-instant` because an 8B model is a poor reference for this claim.
+
+**Deployment difference, by design.** The local and hosted requests carry an identical semantic prompt. They differ only in one deployment control: the local request sets `chat_template_kwargs.enable_thinking = false`; the hosted request sends no such field because the hosted model is not a reasoning model. This difference is a deployment parameter, not a prompt difference, and satisfies section 10.
 
 **Single seed limitation.** One seed gives no estimate of sampling variance. Mitigated by running 3 seeds on the dev split only and reporting the spread as a variance floor. Not eliminated.
 
