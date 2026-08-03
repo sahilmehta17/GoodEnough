@@ -1,0 +1,76 @@
+{
+  "created_utc": "2026-08-03T20:12:43Z",
+  "seed": 42,
+  "source": "huggingface datasets-server rows API",
+  "mmlu_source": "cais/mmlu",
+  "gsm8k_source": "openai/gsm8k:main",
+  "mmlu_per_subject": {
+    "high_school_geography": {
+      "test_available": 198,
+      "validation_available": 22,
+      "map": 100,
+      "router_candidate": 20
+    },
+    "formal_logic": {
+      "test_available": 126,
+      "validation_available": 14,
+      "map": 100,
+      "router_candidate": 20
+    },
+    "nutrition": {
+      "test_available": 306,
+      "validation_available": 33,
+      "map": 100,
+      "router_candidate": 20
+    },
+    "marketing": {
+      "test_available": 234,
+      "validation_available": 25,
+      "map": 100,
+      "router_candidate": 20
+    },
+    "miscellaneous": {
+      "test_available": 783,
+      "validation_available": 86,
+      "map": 100,
+      "router_candidate": 20
+    },
+    "college_mathematics": {
+      "test_available": 100,
+      "validation_available": 11,
+      "map": 100,
+      "router_candidate": 0
+    },
+    "professional_law": {
+      "test_available": 1534,
+      "validation_available": 170,
+      "map": 100,
+      "router_candidate": 20
+    },
+    "high_school_psychology": {
+      "test_available": 545,
+      "validation_available": 60,
+      "map": 100,
+      "router_candidate": 20
+    }
+  },
+  "mmlu_totals": {
+    "dev": 421,
+    "map": 800,
+    "router": 140
+  },
+  "gsm8k": {
+    "test_available": 1319,
+    "totals": {
+      "dev": 50,
+      "map": 150
+    }
+  },
+  "files": {
+    "mmlu_dev.jsonl": "c37f971e805d5fbbd9793fd6fb0886477f9def1c9d88f48413076c789dc89492",
+    "mmlu_map.jsonl": "abd89da9017e61282d5563a3f858141898e42c0e9b598ed9b51003181bc15cde",
+    "mmlu_router.jsonl": "54fb7def81a5d56941408245bf022ce7fa24c9468d6937603aa5e9a7908ba083",
+    "gsm8k_dev.jsonl": "4893e836c34cae2a91e2d1fc69ac71192653994e2588f182ab8ce4949412f3bd",
+    "gsm8k_map.jsonl": "f956f2ffb19e571bb581cea4e644b64ced95a068a7dc592224efb6d0f7e55e47"
+  }
+}

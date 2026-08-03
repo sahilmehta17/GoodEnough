@@ -36,6 +36,7 @@ import os
 import random
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -48,12 +49,26 @@ ROWS_API = "https://datasets-server.huggingface.co/rows"
 PAGE = 100  # the rows API caps a page at 100
 
 
-def _get_json(url: str, max_retries: int = 5) -> dict:
+def _get_json(url: str, max_retries: int = 8) -> dict:
     for attempt in range(max_retries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "goodenough-freeze/0.1"})
             with urllib.request.urlopen(req, timeout=60) as resp:
                 return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            last = attempt == max_retries - 1
+            if exc.code == 429:
+                # Respect the server's cooldown if it tells us one.
+                retry_after = exc.headers.get("Retry-After")
+                wait = float(retry_after) if retry_after else min(60.0, 5.0 * (attempt + 1))
+            elif exc.code in (500, 502, 503):
+                wait = 2 ** attempt
+            else:
+                raise RuntimeError(f"failed to fetch {url}: {exc!r}") from exc
+            if last:
+                raise RuntimeError(f"failed to fetch {url} after {max_retries} tries: {exc!r}") from exc
+            print(f"    {exc.code} on attempt {attempt + 1}, waiting {wait:.0f}s...")
+            time.sleep(wait)
         except Exception as exc:  # noqa: BLE001
             if attempt == max_retries - 1:
                 raise RuntimeError(f"failed to fetch {url}: {exc!r}") from exc
@@ -88,7 +103,7 @@ def fetch_split(dataset: str, config: str, split: str) -> list[dict]:
         offset += PAGE
         if not batch or offset >= total:
             break
-        time.sleep(0.2)  # be polite to the API
+        time.sleep(0.6)  # be polite to the API so it does not rate-limit us
     return rows
 
 
