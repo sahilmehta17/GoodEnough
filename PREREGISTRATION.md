@@ -123,13 +123,28 @@ Zero-shot.
 
 ## 11. Splits, frozen
 
-| Split | Size | Use |
-|---|---|---|
-| dev | ~150 items | Prompt selection, parser construction, discordance estimate, seed variance. Never reported. |
-| map | ~100 per slice | The non-inferiority analysis. |
-| router | ~150 items | Frozen routing policy evaluation only. |
+Concrete policy, fixed on Day 2 before any benchmark call. Selection is deterministic under seed 42. The frozen item content, not just IDs, is committed under `data/frozen/`, so the run does not depend on Hugging Face at runtime.
 
-Split by item id with a fixed seed. Split file committed with this document.
+**MMLU (8 subjects)**
+
+| Split | Source | Size | Use |
+|---|---|---|---|
+| dev | MMLU `validation` split | whatever each subject provides (~11 to ~30 per subject) | Prompt selection, parser construction, discordance estimate, seed variance. Never reported. |
+| map | MMLU `test`, first `min(100, available)` after seeded shuffle | up to 100 per subject | The non-inferiority analysis. |
+| router | MMLU `test`, next up to 20 per subject after the map block | pooled, capped at 150 total | Frozen routing policy evaluation only. Disjoint from map. |
+
+Dev is drawn from MMLU's separate `validation` set so that test items are never spent on parser tuning. This matters because `formal_logic` (primary, 126 test items) and `college_mathematics` (100 test items) are too small to fund dev, map, and router from test alone. Subjects smaller than 100 test items take their whole test set as map and contribute nothing to router; the router pool is filled from the larger subjects. Underpowered small slices are expected to land "inconclusive," which is a pre-registered outcome, not a failure.
+
+**GSM8K**
+
+| Split | Source | Size | Use |
+|---|---|---|---|
+| dev | GSM8K `test`, seeded | 50 | Numeric normalizer construction, step-count method. Never reported. |
+| map | GSM8K `test`, seeded, disjoint from dev | 150 | Difficulty-slope analysis (correctness vs gold step count). |
+
+Gold step count is `solution.count("<<")`, the number of calculator annotations in the GSM8K solution field. Gold answer is the value after `####`.
+
+Split by item id with a fixed seed. The frozen split files and a `MANIFEST.json` recording source dataset revisions, per-subject counts, seed, and content checksums are committed with this document.
 
 ## 12. Scoring rules
 
