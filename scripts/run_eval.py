@@ -127,6 +127,7 @@ def main() -> int:
     counts = {"local": {"done": 0, "skip": 0, "err": 0},
               "hosted": {"done": 0, "skip": 0, "err": 0, "budget_stop": 0}}
 
+    last_done = -1
     for n, item in enumerate(items, 1):
         for role in roles:
             if _already_done(conn, item, role):
@@ -146,7 +147,11 @@ def main() -> int:
                 if role == "hosted":
                     hosted_today += (call.input_tokens or 0) + (call.output_tokens or 0)
 
-        if n % 25 == 0 or n == len(items):
+        # Only print when work was actually done since the last line, so a
+        # budget stop does not spam identical lines that look like a hang.
+        total_done = sum(counts[r]["done"] for r in roles)
+        if (n % 25 == 0 or n == len(items)) and total_done != last_done:
+            last_done = total_done
             msg = f"  [{n}/{len(items)}] "
             for role in roles:
                 c = counts[role]
@@ -154,6 +159,14 @@ def main() -> int:
             if "hosted" in roles:
                 msg += f"| hosted_tokens_today={hosted_today:,}"
             print(msg)
+
+        # If the hosted budget is spent and there is no free local work left in
+        # this run, stop early instead of iterating no-op skips to the end.
+        if "local" not in roles and hosted_today >= args.hosted_budget:
+            counts["hosted"]["budget_stop"] += (len(items) - n)
+            print(f"  hosted budget reached at item {n}; {len(items) - n} items "
+                  f"remain for tomorrow.")
+            break
 
     print("\nDone this run.")
     for role in roles:
