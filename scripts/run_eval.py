@@ -128,6 +128,7 @@ def main() -> int:
               "hosted": {"done": 0, "skip": 0, "err": 0, "budget_stop": 0}}
 
     last_done = -1
+    rate_stop = False
     for n, item in enumerate(items, 1):
         for role in roles:
             if _already_done(conn, item, role):
@@ -138,6 +139,15 @@ def main() -> int:
                 continue
 
             call = _call(role, item)
+
+            # A long Groq cooldown: stop cleanly, do not record the item so it is
+            # retried next run, do not sleep through the cooldown.
+            if role == "hosted" and call.error and call.error.startswith("RATE_LIMIT_STOP"):
+                rate_stop = True
+                print(f"  Groq issued a long cooldown at item {n} ({call.error}). "
+                      f"Stopping cleanly; re-run later to resume.")
+                break
+
             store.insert_row(conn, _row(call, item))
 
             if call.error:
@@ -146,6 +156,10 @@ def main() -> int:
                 counts[role]["done"] += 1
                 if role == "hosted":
                     hosted_today += (call.input_tokens or 0) + (call.output_tokens or 0)
+
+        if rate_stop:
+            counts["hosted"]["budget_stop"] += (len(items) - n + 1)
+            break
 
         # Only print when work was actually done since the last line, so a
         # budget stop does not spam identical lines that look like a hang.

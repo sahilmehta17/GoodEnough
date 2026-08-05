@@ -47,6 +47,10 @@ _USER_AGENT = (
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 )
 
+# If Groq asks us to wait longer than this on a 429, treat it as a window/daily
+# limit and stop cleanly rather than blocking the whole run inside one sleep.
+MAX_INLINE_WAIT = 120.0
+
 
 def _post(url: str, payload: dict, headers: dict | None, timeout: int):
     """Single HTTP POST. Returns (latency_s, status, headers, parsed_json)."""
@@ -162,9 +166,23 @@ def call_hosted(user_content: str, max_tokens: int, timeout: int = 120,
 
         last_error = data.get("__error__", f"status={status}")
         if status == 429:
-            wait = float(hdrs.get("retry-after", 2 ** retries))
+            retry_after = hdrs.get("retry-after")
+            wait = float(retry_after) if retry_after else float(2 ** retries)
+            # A long cooldown means a per-minute or daily window is exhausted.
+            # Do NOT sleep through it (that looks like a hang). Signal the runner
+            # to stop cleanly and resume later; the item is left unrecorded so it
+            # is retried next run.
+            if wait > MAX_INLINE_WAIT:
+                return CallResult(
+                    model_role="hosted", model_id_requested=config.HOSTED_MODEL_ID,
+                    model_id_returned=None, rendered_input=user_content, raw_response="",
+                    input_tokens=None, output_tokens=None, latency_ms=total_latency_ms,
+                    retries=retries, http_status=429,
+                    error=f"RATE_LIMIT_STOP retry_after={wait:.0f}s",
+                )
+            wait = min(wait, 60.0)
         elif status in (500, 502, 503, 0):
-            wait = 2 ** retries
+            wait = min(float(2 ** retries), 30.0)
         else:
             break  # 4xx other than 429 will not fix themselves
         time.sleep(wait)
