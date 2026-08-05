@@ -161,6 +161,78 @@ def bootstrap_paired(local: list[int], hosted: list[int], iters: int = 10000,
     return {"lower": lo, "upper": hi}
 
 
+def _sigmoid(z: float) -> float:
+    if z >= 0:
+        return 1.0 / (1.0 + math.exp(-z))
+    e = math.exp(z)
+    return e / (1.0 + e)
+
+
+def logistic_fit(xs: list[float], ys: list[int], iters: int = 60) -> tuple[float, float]:
+    """
+    One-feature logistic regression (intercept + slope) by Newton-Raphson / IRLS.
+    Returns (intercept, slope). Slope is the change in log-odds of a correct
+    answer per additional reasoning step. Guards against divergence.
+    """
+    b0, b1 = 0.0, 0.0
+    for _ in range(iters):
+        g0 = g1 = h00 = h01 = h11 = 0.0
+        for x, y in zip(xs, ys):
+            p = _sigmoid(b0 + b1 * x)
+            w = p * (1.0 - p)
+            g0 += (y - p)
+            g1 += (y - p) * x
+            h00 += w
+            h01 += w * x
+            h11 += w * x * x
+        det = h00 * h11 - h01 * h01
+        if abs(det) < 1e-12:
+            break
+        db0 = (h11 * g0 - h01 * g1) / det
+        db1 = (h00 * g1 - h01 * g0) / det
+        if not (math.isfinite(db0) and math.isfinite(db1)):
+            break
+        b0 += db0
+        b1 += db1
+        if abs(db0) + abs(db1) < 1e-9:
+            break
+    return b0, b1
+
+
+def bootstrap_slope(xs: list[float], ys: list[int], iters: int = 2000,
+                    seed: int = 42, tail: float = 0.05) -> dict:
+    """Bootstrap CI for the logistic slope (resample items, refit)."""
+    n = len(xs)
+    if n == 0:
+        return {"lower": None, "upper": None}
+    pairs = list(zip(xs, ys))
+    rng = random.Random(seed)
+    slopes = []
+    for _ in range(iters):
+        sx, sy = [], []
+        for _ in range(n):
+            x, y = pairs[rng.randrange(n)]
+            sx.append(x)
+            sy.append(y)
+        _, s = logistic_fit(sx, sy)
+        if math.isfinite(s):
+            slopes.append(s)
+    if not slopes:
+        return {"lower": None, "upper": None}
+    slopes.sort()
+    lo = slopes[max(0, int(tail * len(slopes)) - 1)]
+    hi = slopes[min(len(slopes) - 1, int((1.0 - tail) * len(slopes)))]
+    return {"lower": lo, "upper": hi}
+
+
+def bucket_accuracy(steps: list[int], correct: list[int]) -> dict:
+    """Accuracy grouped by exact step count. Descriptive companion to the slope."""
+    buckets: dict[int, list[int]] = {}
+    for s, c in zip(steps, correct):
+        buckets.setdefault(s, []).append(c)
+    return {s: {"n": len(v), "acc": sum(v) / len(v)} for s, v in sorted(buckets.items())}
+
+
 def verdict(lower: float, upper: float, margin: float) -> str:
     """
     Three-way classification at a non-inferiority margin (e.g. 0.10).
@@ -171,6 +243,66 @@ def verdict(lower: float, upper: float, margin: float) -> str:
     if upper < -margin:
         return "below_margin"
     return "inconclusive"
+
+
+def evaluate_router_policies(items: list[dict], subject_verdict: dict) -> dict:
+    """
+    Compare routing policies on the held-out router split.
+
+    Each item is a dict with: subject, local_correct (0/1), local_parse_ok (bool),
+    hosted_correct (0/1). subject_verdict maps subject -> map verdict string.
+
+    Policies:
+      always_local   - never call the hosted model (free, lowest accuracy floor)
+      always_hosted  - always call hosted (most expensive, accuracy ceiling of a
+                       single model)
+      map_based      - use local where the map judged the subject non_inferior,
+                       else hosted. This is the policy the map actually produces.
+      cascade        - answer local; escalate to hosted only when the local answer
+                       failed to parse. Needs no per-subject metadata.
+      oracle         - per item, right whenever EITHER model is right. Not a real
+                       policy; reported only as an upper bound on what routing
+                       could achieve.
+
+    'hosted_calls' is how many of the n items were sent to the hosted model, which
+    is the cost proxy (local calls are free).
+    """
+    n = len(items)
+    if n == 0:
+        return {}
+
+    def acc(hits):
+        return hits / n
+
+    out = {}
+    out["always_local"] = {"accuracy": acc(sum(i["local_correct"] for i in items)),
+                           "hosted_calls": 0, "n": n}
+    out["always_hosted"] = {"accuracy": acc(sum(i["hosted_correct"] for i in items)),
+                            "hosted_calls": n, "n": n}
+
+    hits = calls = 0
+    for i in items:
+        if subject_verdict.get(i["subject"]) == "non_inferior":
+            hits += i["local_correct"]
+        else:
+            hits += i["hosted_correct"]
+            calls += 1
+    out["map_based"] = {"accuracy": acc(hits), "hosted_calls": calls, "n": n}
+
+    hits = calls = 0
+    for i in items:
+        if i["local_parse_ok"]:
+            hits += i["local_correct"]
+        else:
+            hits += i["hosted_correct"]
+            calls += 1
+    out["cascade"] = {"accuracy": acc(hits), "hosted_calls": calls, "n": n,
+                      "escalation_rate": calls / n}
+
+    out["oracle"] = {"accuracy": acc(sum(1 for i in items
+                                         if i["local_correct"] or i["hosted_correct"])),
+                     "hosted_calls": None, "n": n}
+    return out
 
 
 def slice_result(local: list[int], hosted: list[int], margin: float,
