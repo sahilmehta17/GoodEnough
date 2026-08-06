@@ -38,27 +38,19 @@ Things that are explicitly OUT of scope and must not be built:
 
 The HTTP layer is the easy part. The risk is in model invocation, prompt formatting, token limits, parsing, caching, quota behavior, and reproducible scoring. Surface those on day one.
 
-**Day 1: one vertical slice, no HTTP.** A script that takes one MMLU item, calls local, calls hosted, stores both raw responses, parses and scores both, emits one paired result row.
+**Done.** One vertical slice with no HTTP (single paired item, local + hosted, scored). Cache and replay keyed on `model + prompt + sampling params + seed`, token counts, end-to-end latency, SQLite persistence. The tripwire passed: a paired benchmark item round-trips through the complete measurement path and reproduces exactly from cache. The full resumable, budget-aware runner. The public repo, `PREREGISTRATION.md`, and the split file, committed before any evaluation call. The dev split, parser, discordance estimate, 3-seed variance check, required-n computation, frozen slice count. Loader, scorer, WAL store, analysis engine, and the map/GSM8K/router builders. Local evaluation across every split.
 
-**Day 2: cache and replay.** Cache keyed on `model + prompt + sampling params + seed`. Token counts, end-to-end latency, SQLite persistence.
+**In progress.** Hosted evaluation against Groq, resuming across days as the token budget resets.
 
-> **TRIPWIRE.** By end of day 2, one paired benchmark item must round-trip through the complete measurement path and reproduce exactly from cache. Not a proxy request. A scored paired row. If that does not exist, stop and report it.
+**Remaining.** Finish the map once hosted data is complete: intervals, three-status classification, chart, GSM8K step-count slope (secondary and cuttable). Then the proxy, router policy evaluation, and writeup.
 
-**Day 3: the full runner.** Iterate items, respect rate limits, resume after the daily token ceiling, retry with backoff.
-
-**Day 4: public repo.** README with hypothesis, margin, named primary slices, method, "results pending." `PREREGISTRATION.md` and the split file committed **before any evaluation call**.
-
-**Week 1 weekend: dev split.** Prompts, parser, discordance estimate, 3-seed variance check. Compute required n. Freeze slice count. Start the map run.
-
-**Week 2: the map.** Scoring, aggregation, intervals, three-status classification, chart. GSM8K step-count slope, secondary and cuttable.
-
-**Week 3: proxy, router, writeup.**
+> **TRIPWIRE (historical, already satisfied).** By end of the caching milestone, one paired benchmark item had to round-trip through the complete measurement path and reproduce exactly from cache. Not a proxy request. A scored paired row. It did. Kept here as a record of what was checked, not as an open gate.
 
 ---
 
 ## Hard constraints
 
-**Resumability is not optional.** Groq free plan gives `llama-3.3-70b-versatile` 1K requests/day but only **100K tokens/day**. The full run is ~287K tokens, so it spans 3 to 4 days. TPD binds before RPD. The runner must stop at the ceiling and resume tomorrow from cache without redoing work. Build this on day 3, not when you first hit a 429.
+**Resumability is not optional.** Groq free plan gives `llama-3.3-70b-versatile` 1K requests/day but only **100K tokens/day**. The full run is ~287K tokens, so it spans 3 to 4 days. TPD binds before RPD. The runner stops at the ceiling and resumes from cache without redoing work (`scripts/run_eval.py`). This is already built. Do not regress it.
 
 **Cached tokens do not count toward Groq limits.** The cache is load-bearing.
 
@@ -73,7 +65,7 @@ The HTTP layer is the easy part. The risk is in model invocation, prompt formatt
 ## Stack
 
 - **Runner, scoring, statistics:** Python
-- **Proxy (week 3 only):** Node/TypeScript, Express
+- **Proxy (not yet built, last in build order):** Node/TypeScript, Express
 - **Storage:** SQLite
 - **Local inference:** llama.cpp `llama-server`, OpenAI-shaped endpoint on `localhost:8080`
 - **Hosted inference:** Groq, `llama-3.3-70b-versatile`
@@ -127,9 +119,9 @@ p95 from 100 requests is set by five observations. Per-slice latency is descript
 
 ## Definition of done
 
-**Week 2 floor.** Public repo, map over at least 6 slices with intervals and three-status classification, README explaining it. **If only this ships, the project succeeded.**
+**Floor (nearly done).** Public repo, map over at least 6 slices with intervals and three-status classification, README explaining it. The MMLU map is generated (`reports/map.md`); GSM8K's slope analysis and the pooled cost/latency numbers are the remaining pieces once hosted evaluation finishes. **If only this ships, the project succeeded.**
 
-**Week 3.** The above plus four routing policies, oracle bound, held-out evaluation, full writeup with the manifest.
+**Stretch (remaining).** The above plus four routing policies, oracle bound, held-out evaluation, full writeup with the manifest.
 
 **If behind:** cut slices, cut GSM8K, cut the cascade policy. **Never cut** the frozen splits, the predeclared margin, or the confidence intervals. Those are the entire value of the project.
 
