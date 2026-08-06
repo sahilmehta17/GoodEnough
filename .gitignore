@@ -1,4 +1,4 @@
-﻿.env
+.env
 *.env
 __pycache__/
 *.pyc
@@ -11,3 +11,6 @@ data/cache/
 *.db
 models/
 *.gguf
+CURSOR_HANDOFF.md
+docs/superpowers/
+.cursor/
