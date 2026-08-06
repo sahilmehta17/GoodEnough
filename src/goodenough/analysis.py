@@ -265,7 +265,11 @@ def evaluate_router_policies(items: list[dict], subject_verdict: dict) -> dict:
                        could achieve.
 
     'hosted_calls' is how many of the n items were sent to the hosted model, which
-    is the cost proxy (local calls are free).
+    is the cost proxy (local calls are free). 'hosted_item_ids' is that same set
+    named by item_id (None on an item means the caller did not supply one), so a
+    cost report can attribute dollars and latency per item rather than just
+    counting calls. It is additive: existing keys and values are unchanged from
+    callers that only read accuracy / hosted_calls / n / escalation_rate.
     """
     n = len(items)
     if n == 0:
@@ -274,34 +278,42 @@ def evaluate_router_policies(items: list[dict], subject_verdict: dict) -> dict:
     def acc(hits):
         return hits / n
 
+    def ids(selected):
+        return [i.get("item_id") for i in selected]
+
     out = {}
     out["always_local"] = {"accuracy": acc(sum(i["local_correct"] for i in items)),
-                           "hosted_calls": 0, "n": n}
+                           "hosted_calls": 0, "n": n, "hosted_item_ids": []}
     out["always_hosted"] = {"accuracy": acc(sum(i["hosted_correct"] for i in items)),
-                            "hosted_calls": n, "n": n}
+                            "hosted_calls": n, "n": n, "hosted_item_ids": ids(items)}
 
     hits = calls = 0
+    hosted = []
     for i in items:
         if subject_verdict.get(i["subject"]) == "non_inferior":
             hits += i["local_correct"]
         else:
             hits += i["hosted_correct"]
             calls += 1
-    out["map_based"] = {"accuracy": acc(hits), "hosted_calls": calls, "n": n}
+            hosted.append(i)
+    out["map_based"] = {"accuracy": acc(hits), "hosted_calls": calls, "n": n,
+                        "hosted_item_ids": ids(hosted)}
 
     hits = calls = 0
+    hosted = []
     for i in items:
         if i["local_parse_ok"]:
             hits += i["local_correct"]
         else:
             hits += i["hosted_correct"]
             calls += 1
+            hosted.append(i)
     out["cascade"] = {"accuracy": acc(hits), "hosted_calls": calls, "n": n,
-                      "escalation_rate": calls / n}
+                      "escalation_rate": calls / n, "hosted_item_ids": ids(hosted)}
 
     out["oracle"] = {"accuracy": acc(sum(1 for i in items
                                          if i["local_correct"] or i["hosted_correct"])),
-                     "hosted_calls": None, "n": n}
+                     "hosted_calls": None, "n": n, "hosted_item_ids": None}
     return out
 
 

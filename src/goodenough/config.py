@@ -73,6 +73,24 @@ SEED = 42
 
 
 # --------------------------------------------------------------------------
+# Pricing, for the cost report only. Not used by anything that runs a call.
+# --------------------------------------------------------------------------
+
+# Groq pricing for llama-3.3-70b-versatile, USD per 1M tokens.
+# Read from https://console.groq.com/docs/models on 2026-08-06 (groq.com/pricing
+# itself is a client-rendered page that did not yield pricing text to a fetch;
+# console.groq.com/docs/models is Groq's own docs and states the same figures
+# independently reported by third-party Groq pricing trackers on the same date).
+HOSTED_PRICE_INPUT_PER_M = 0.59
+HOSTED_PRICE_OUTPUT_PER_M = 0.79
+
+# Local inference is zero incremental API spend. It is not economically free;
+# say so in the report text.
+LOCAL_PRICE_INPUT_PER_M = 0.0
+LOCAL_PRICE_OUTPUT_PER_M = 0.0
+
+
+# --------------------------------------------------------------------------
 # Prompt templates, identical across deployments (PREREGISTRATION.md section 10)
 # --------------------------------------------------------------------------
 
