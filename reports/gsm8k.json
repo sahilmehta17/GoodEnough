@@ -1,0 +1,109 @@
+{
+  "created_utc": "2026-08-10T16:26:32.770211+00:00",
+  "models": {
+    "local": {
+      "n": 150,
+      "overall_acc": 0.7933333333333333,
+      "n_correct": 119,
+      "n_incorrect": 31,
+      "slope_per_step": -0.5121426337796442,
+      "slope_ci": [
+        -0.7972225215959455,
+        -0.29807227015384785
+      ],
+      "slope_interpretable": true,
+      "slope_not_interpretable_reason": null,
+      "min_minority_outcomes": 5,
+      "accuracy_by_steps": {
+        "0": {
+          "n": 2,
+          "acc": 1.0
+        },
+        "1": {
+          "n": 7,
+          "acc": 1.0
+        },
+        "2": {
+          "n": 46,
+          "acc": 0.8695652173913043
+        },
+        "3": {
+          "n": 34,
+          "acc": 0.8823529411764706
+        },
+        "4": {
+          "n": 31,
+          "acc": 0.6774193548387096
+        },
+        "5": {
+          "n": 22,
+          "acc": 0.6818181818181818
+        },
+        "6": {
+          "n": 5,
+          "acc": 0.6
+        },
+        "7": {
+          "n": 2,
+          "acc": 0.5
+        },
+        "8": {
+          "n": 1,
+          "acc": 0.0
+        }
+      }
+    },
+    "hosted": {
+      "n": 150,
+      "overall_acc": 0.9866666666666667,
+      "n_correct": 148,
+      "n_incorrect": 2,
+      "slope_per_step": 0.4337054037024681,
+      "slope_ci": [
+        5.020624756787785e-15,
+        0.9424712854497108
+      ],
+      "slope_interpretable": false,
+      "slope_not_interpretable_reason": "only 2 of 150 responses fall in the rarer outcome (2 incorrect, 148 correct); below the 5-response floor the logistic fit is near separable and the slope is set by those few responses",
+      "min_minority_outcomes": 5,
+      "accuracy_by_steps": {
+        "0": {
+          "n": 2,
+          "acc": 1.0
+        },
+        "1": {
+          "n": 7,
+          "acc": 1.0
+        },
+        "2": {
+          "n": 46,
+          "acc": 0.9782608695652174
+        },
+        "3": {
+          "n": 34,
+          "acc": 0.9705882352941176
+        },
+        "4": {
+          "n": 31,
+          "acc": 1.0
+        },
+        "5": {
+          "n": 22,
+          "acc": 1.0
+        },
+        "6": {
+          "n": 5,
+          "acc": 1.0
+        },
+        "7": {
+          "n": 2,
+          "acc": 1.0
+        },
+        "8": {
+          "n": 1,
+          "acc": 1.0
+        }
+      }
+    }
+  }
+}

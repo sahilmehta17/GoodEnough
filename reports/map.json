@@ -1,12 +1,17 @@
 {
-  "created_utc": "2026-08-06T19:13:10.028016+00:00",
+  "created_utc": "2026-08-10T16:26:32.280332+00:00",
   "margin": 0.1,
+  "sensitivity_margins": [
+    0.05,
+    0.1,
+    0.15
+  ],
   "local_model": "unsloth/Qwen3-1.7B-GGUF:Q4_K_M",
   "hosted_model": "llama-3.3-70b-versatile",
   "dev_discordance": {
-    "n": 300,
-    "discordant": 110,
-    "rate": 0.36666666666666664
+    "n": 421,
+    "discordant": 151,
+    "rate": 0.3586698337292161
   },
   "map_slices": [
     {
@@ -154,6 +159,220 @@
       "primary": false
     }
   ],
+  "map_sensitivity": [
+    {
+      "subject": "high_school_geography",
+      "primary": true,
+      "verdicts": {
+        "0.05": "below_margin",
+        "0.10": "below_margin",
+        "0.15": "below_margin"
+      }
+    },
+    {
+      "subject": "formal_logic",
+      "primary": true,
+      "verdicts": {
+        "0.05": "below_margin",
+        "0.10": "below_margin",
+        "0.15": "below_margin"
+      }
+    },
+    {
+      "subject": "nutrition",
+      "primary": false,
+      "verdicts": {
+        "0.05": "below_margin",
+        "0.10": "below_margin",
+        "0.15": "below_margin"
+      }
+    },
+    {
+      "subject": "marketing",
+      "primary": false,
+      "verdicts": {
+        "0.05": "below_margin",
+        "0.10": "inconclusive",
+        "0.15": "inconclusive"
+      }
+    },
+    {
+      "subject": "miscellaneous",
+      "primary": false,
+      "verdicts": {
+        "0.05": "below_margin",
+        "0.10": "below_margin",
+        "0.15": "inconclusive"
+      }
+    },
+    {
+      "subject": "college_mathematics",
+      "primary": false,
+      "verdicts": {
+        "0.05": "below_margin",
+        "0.10": "inconclusive",
+        "0.15": "inconclusive"
+      }
+    },
+    {
+      "subject": "professional_law",
+      "primary": false,
+      "verdicts": {
+        "0.05": "below_margin",
+        "0.10": "below_margin",
+        "0.15": "below_margin"
+      }
+    },
+    {
+      "subject": "high_school_psychology",
+      "primary": false,
+      "verdicts": {
+        "0.05": "inconclusive",
+        "0.10": "inconclusive",
+        "0.15": "inconclusive"
+      }
+    }
+  ],
+  "map_unparseable": {
+    "college_mathematics": {
+      "hosted": {
+        "unparseable": 20,
+        "unparseable_scored_incorrect": 20,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.2
+      },
+      "local": {
+        "unparseable": 25,
+        "unparseable_scored_incorrect": 25,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.25
+      }
+    },
+    "formal_logic": {
+      "hosted": {
+        "unparseable": 5,
+        "unparseable_scored_incorrect": 5,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.05
+      },
+      "local": {
+        "unparseable": 13,
+        "unparseable_scored_incorrect": 13,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.13
+      }
+    },
+    "high_school_geography": {
+      "hosted": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      },
+      "local": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      }
+    },
+    "high_school_psychology": {
+      "hosted": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      },
+      "local": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      }
+    },
+    "marketing": {
+      "hosted": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      },
+      "local": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      }
+    },
+    "miscellaneous": {
+      "hosted": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      },
+      "local": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      }
+    },
+    "nutrition": {
+      "hosted": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      },
+      "local": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      }
+    },
+    "professional_law": {
+      "hosted": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      },
+      "local": {
+        "unparseable": 0,
+        "unparseable_scored_incorrect": 0,
+        "n": 100,
+        "errors": 0,
+        "rate": 0.0
+      }
+    }
+  },
+  "difficulty_correlation": {
+    "r": 0.3491277988851995,
+    "ci_lower": -0.2923458710550984,
+    "ci_upper": 0.9462731372068204,
+    "n_slices": 8,
+    "bootstrap_iters": 10000,
+    "bootstrap_seed": 42,
+    "resamples_used": 10000,
+    "spans_zero": true
+  },
   "map_cost_latency": {
     "local": {
       "n": 800,

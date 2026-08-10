@@ -161,6 +161,80 @@ def bootstrap_paired(local: list[int], hosted: list[int], iters: int = 10000,
     return {"lower": lo, "upper": hi}
 
 
+def outcome_breakdown(local: list[int], hosted: list[int]) -> dict:
+    """
+    The four-way split of a paired set of items: both right, one right, neither.
+
+    'both_correct' and 'neither_correct' are the concordant cells; routing can
+    do nothing about them. 'local_only' is the only cell where any router can
+    beat always-hosted, so it bounds the whole idea. Counting all four means no
+    item is unaccounted for: the cells sum to n.
+    """
+    both = local_only = hosted_only = neither = 0
+    for l, h in zip(local, hosted):
+        if l and h:
+            both += 1
+        elif l:
+            local_only += 1
+        elif h:
+            hosted_only += 1
+        else:
+            neither += 1
+    return {"both_correct": both, "local_only": local_only,
+            "hosted_only": hosted_only, "neither_correct": neither,
+            "n": len(local)}
+
+
+def pearson(xs: list[float], ys: list[float]) -> float | None:
+    """
+    Pearson correlation. None when it is undefined: fewer than two points,
+    mismatched lengths, or either variable constant. None means "not defined
+    here", never 0.0, so a caller cannot mistake an undefined correlation for
+    a measured absence of one.
+    """
+    n = len(xs)
+    if n < 2 or n != len(ys):
+        return None
+    mx = sum(xs) / n
+    my = sum(ys) / n
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    sxx = sum((x - mx) ** 2 for x in xs)
+    syy = sum((y - my) ** 2 for y in ys)
+    if sxx <= 0.0 or syy <= 0.0:
+        return None
+    r = sxy / math.sqrt(sxx * syy)
+    return max(-1.0, min(1.0, r))  # clamp float drift at the boundaries
+
+
+def bootstrap_pearson(xs: list[float], ys: list[float], iters: int = 10000,
+                      seed: int = 42, tail: float = 0.025) -> dict:
+    """
+    Percentile bootstrap CI for pearson(), resampling the (x, y) pairs. With
+    tail=0.025 the returned lower and upper are a two-sided 95% interval.
+
+    Resamples where the correlation is undefined (a constant column, which
+    happens easily when the number of points is small) are dropped rather than
+    scored as zero. 'iters_used' reports how many survived.
+    """
+    n = len(xs)
+    if n < 2 or n != len(ys):
+        return {"lower": None, "upper": None, "iters_used": 0}
+    pairs = list(zip(xs, ys))
+    rng = random.Random(seed)
+    rs = []
+    for _ in range(iters):
+        sample = [pairs[rng.randrange(n)] for _ in range(n)]
+        r = pearson([p[0] for p in sample], [p[1] for p in sample])
+        if r is not None:
+            rs.append(r)
+    if not rs:
+        return {"lower": None, "upper": None, "iters_used": 0}
+    rs.sort()
+    lo = rs[max(0, int(tail * len(rs)) - 1)]
+    hi = rs[min(len(rs) - 1, int((1.0 - tail) * len(rs)))]
+    return {"lower": lo, "upper": hi, "iters_used": len(rs)}
+
+
 def _sigmoid(z: float) -> float:
     if z >= 0:
         return 1.0 / (1.0 + math.exp(-z))

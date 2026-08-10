@@ -1,3 +1,4 @@
+import math
 import unittest
 
 from src.goodenough import analysis
@@ -104,6 +105,93 @@ class RouterPolicyHostedItemIdsTests(unittest.TestCase):
 
     def test_oracle_has_no_hosted_item_ids_because_it_is_not_deployable(self):
         self.assertIsNone(self.result["oracle"]["hosted_item_ids"])
+
+
+class OutcomeBreakdownTests(unittest.TestCase):
+    """
+    The four-way split of a paired split: how often each model was alone in
+    getting an item right. 'local_only' is the quantity that decides whether
+    routing can beat always-hosted at all.
+    """
+
+    def test_counts_each_of_the_four_cells(self):
+        local = [1, 1, 0, 0, 1]
+        hosted = [1, 0, 1, 0, 1]
+        got = analysis.outcome_breakdown(local, hosted)
+        self.assertEqual(got["both_correct"], 2)      # items 1, 5
+        self.assertEqual(got["local_only"], 1)        # item 2
+        self.assertEqual(got["hosted_only"], 1)       # item 3
+        self.assertEqual(got["neither_correct"], 1)   # item 4
+        self.assertEqual(got["n"], 5)
+
+    def test_four_cells_sum_to_n_so_no_item_is_dropped(self):
+        local = [1, 0, 1, 0, 0, 1, 1]
+        hosted = [0, 0, 1, 1, 0, 1, 0]
+        got = analysis.outcome_breakdown(local, hosted)
+        total = (got["both_correct"] + got["local_only"]
+                 + got["hosted_only"] + got["neither_correct"])
+        self.assertEqual(total, got["n"])
+        self.assertEqual(got["n"], len(local))
+
+    def test_empty_input_is_all_zeros_not_an_error(self):
+        got = analysis.outcome_breakdown([], [])
+        self.assertEqual(got, {"both_correct": 0, "local_only": 0, "hosted_only": 0,
+                               "neither_correct": 0, "n": 0})
+
+
+class PearsonTests(unittest.TestCase):
+    """Pearson correlation, used across slices for the difficulty check."""
+
+    def test_perfect_positive_relationship_is_one(self):
+        self.assertAlmostEqual(analysis.pearson([1, 2, 3, 4], [2, 4, 6, 8]), 1.0, places=12)
+
+    def test_perfect_negative_relationship_is_minus_one(self):
+        self.assertAlmostEqual(analysis.pearson([1, 2, 3, 4], [8, 6, 4, 2]), -1.0, places=12)
+
+    def test_known_value_on_a_hand_checked_sample(self):
+        # Both means are 3. Centred: dx = [-2,-1,0,1,2], dy = [-1,-2,1,0,2].
+        # sum(dx*dy) = 8, sum(dx^2) = sum(dy^2) = 10, so r = 8/10 = 0.8.
+        xs = [1.0, 2.0, 3.0, 4.0, 5.0]
+        ys = [2.0, 1.0, 4.0, 3.0, 5.0]
+        self.assertAlmostEqual(analysis.pearson(xs, ys), 0.8, places=12)
+
+    def test_zero_variance_is_undefined_and_returns_none(self):
+        self.assertIsNone(analysis.pearson([3, 3, 3], [1, 2, 3]))
+
+    def test_fewer_than_two_points_returns_none(self):
+        self.assertIsNone(analysis.pearson([1.0], [2.0]))
+
+
+class BootstrapPearsonTests(unittest.TestCase):
+    """Percentile bootstrap over the (x, y) pairs, same shape as the other CIs."""
+
+    XS = [0.95, 0.68, 0.85, 0.91, 0.90, 0.44, 0.64, 0.92]
+    YS = [-0.22, -0.33, -0.22, -0.16, -0.21, -0.18, -0.29, -0.12]
+
+    def test_interval_is_ordered_and_inside_the_correlation_range(self):
+        got = analysis.bootstrap_pearson(self.XS, self.YS, iters=500, seed=42)
+        self.assertLessEqual(got["lower"], got["upper"])
+        self.assertGreaterEqual(got["lower"], -1.0)
+        self.assertLessEqual(got["upper"], 1.0)
+
+    def test_same_seed_gives_the_same_interval(self):
+        a = analysis.bootstrap_pearson(self.XS, self.YS, iters=500, seed=42)
+        b = analysis.bootstrap_pearson(self.XS, self.YS, iters=500, seed=42)
+        self.assertEqual(a, b)
+
+    def test_perfectly_correlated_data_bootstraps_to_one(self):
+        xs = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+        got = analysis.bootstrap_pearson(xs, [2 * x for x in xs], iters=300, seed=42)
+        self.assertAlmostEqual(got["lower"], 1.0, places=9)
+        self.assertAlmostEqual(got["upper"], 1.0, places=9)
+
+    def test_resamples_with_no_variance_are_skipped_not_counted_as_zero(self):
+        # Only two distinct points: many resamples draw the same point twice,
+        # where r is undefined. Those must be dropped, leaving a finite interval.
+        got = analysis.bootstrap_pearson([1.0, 2.0], [1.0, 2.0], iters=200, seed=42)
+        self.assertIsNotNone(got["lower"])
+        self.assertTrue(math.isfinite(got["lower"]))
+        self.assertTrue(math.isfinite(got["upper"]))
 
 
 if __name__ == "__main__":

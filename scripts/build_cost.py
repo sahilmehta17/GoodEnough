@@ -139,10 +139,14 @@ def policy_economics(policy_key: str, policy: dict, metrics: dict, all_item_ids:
     n = policy["n"]
     hosted_ids = set(policy["hosted_item_ids"])
 
+    # Summed in all_item_ids order, not set-iteration order. Set iteration over
+    # strings follows the per-process hash seed, and float addition is not
+    # associative, so summing the set directly moved the last bits of the total
+    # between runs and churned the generated CSV. Same items either way.
     dollars_total = sum(
         item_dollars(metrics[iid]["hosted_input_tokens"], metrics[iid]["hosted_output_tokens"],
                      config.HOSTED_PRICE_INPUT_PER_M, config.HOSTED_PRICE_OUTPUT_PER_M)
-        for iid in hosted_ids
+        for iid in all_item_ids if iid in hosted_ids
     )
 
     per_item_ms = []

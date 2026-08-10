@@ -10,6 +10,7 @@ try:
     from scipy import optimize as sp_optimize
     from scipy.special import betainc as sp_betainc
     from scipy.stats import beta as sp_beta
+    from scipy.stats import pearsonr as sp_pearsonr
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
@@ -18,6 +19,7 @@ from src.goodenough import analysis
 
 BETAINC_TOLERANCE = 1e-10
 CP_TOLERANCE = 1e-9
+PEARSON_TOLERANCE = 1e-12  # closed form vs closed form
 LOGISTIC_SLOPE_TOLERANCE = 1e-3  # iterative fit vs iterative fit, looser by design
 
 
@@ -110,6 +112,37 @@ class ClopperPearsonVsScipyTests(unittest.TestCase):
             self.assertLess(abs(analysis.cp_lower(k, 1, 0.05) -
                                (0.0 if k == 0 else sp_beta.ppf(0.05, k, 1 - k + 1))),
                            CP_TOLERANCE)
+
+
+@unittest.skipUnless(SCIPY_AVAILABLE, "scipy not installed; dev-only cross-check")
+class PearsonVsScipyTests(unittest.TestCase):
+    """
+    analysis.pearson backs the difficulty correlation in reports/map.md.
+    scipy.stats.pearsonr is the reference; both are closed forms, so they
+    should agree to floating-point noise.
+    """
+
+    CASES = [
+        # The eight map slices: hosted accuracy against delta.
+        ([0.95, 0.68, 0.85, 0.91, 0.90, 0.44, 0.64, 0.92],
+         [-0.22, -0.33, -0.22, -0.16, -0.21, -0.18, -0.29, -0.12]),
+        ([1.0, 2.0, 3.0, 4.0, 5.0], [2.0, 1.0, 4.0, 3.0, 5.0]),
+        ([1.0, 2.0, 3.0, 4.0], [8.0, 6.0, 4.0, 2.0]),          # exactly -1
+        ([-3.0, 12.5, 0.25, 7.0, -0.5], [110.0, -4.0, 3.5, 88.0, 0.0]),
+        ([0.0, 1e-6, 2e-6, 3e-6], [1e6, 2e6, 4e6, 8e6]),        # extreme scales
+    ]
+
+    def test_matches_scipy_pearsonr(self):
+        max_dev = 0.0
+        for xs, ys in self.CASES:
+            ours = analysis.pearson(xs, ys)
+            theirs = float(sp_pearsonr(xs, ys)[0])
+            dev = abs(ours - theirs)
+            max_dev = max(max_dev, dev)
+            self.assertLess(dev, PEARSON_TOLERANCE,
+                            f"pearson(xs={xs}, ys={ys}): ours={ours!r} scipy={theirs!r}")
+        print(f"\n[pearson] max deviation vs scipy over {len(self.CASES)} "
+             f"datasets: {max_dev:.3e}")
 
 
 @unittest.skipUnless(SCIPY_AVAILABLE, "scipy not installed; dev-only cross-check")
