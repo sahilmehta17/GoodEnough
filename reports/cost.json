@@ -1,5 +1,5 @@
 {
-  "created_utc": "2026-08-10T16:26:35.167096+00:00",
+  "created_utc": "2026-08-10T17:00:35.278139+00:00",
   "pricing": {
     "hosted_input_per_m_usd": 0.59,
     "hosted_output_per_m_usd": 0.79,
@@ -12,7 +12,6 @@
     "total_output_tokens": 145349,
     "hosted_list_price_equivalent_usd": 0.25504215999999996,
     "local_machine_occupancy_seconds": 10362.93875469995,
-    "actual_cash_spent_usd": 0.0,
     "local_incremental_api_spend_usd": 0.0
   },
   "latency_inversion": {

@@ -2,7 +2,7 @@
 
 **Where is a 1.7B model running on a laptop CPU good enough to replace a hosted 70B model?**
 
-Nowhere on these eight MMLU slices. No slice establishes non-inferiority at the margin: five fall below it and three are inconclusive at n = 100. Local is `unsloth/Qwen3-1.7B-GGUF` Q4_K_M on a consumer CPU, hosted is Groq `llama-3.3-70b-versatile`, 100 paired items per slice, margin fixed at 10 points before any data was collected.
+On none of the eight slices does the local model establish non-inferiority at the 10-point margin. Five fall below the margin. Three are inconclusive at n = 100, meaning the data cannot decide them in either direction. Local is `unsloth/Qwen3-1.7B-GGUF` Q4_K_M on a consumer CPU, hosted is Groq `llama-3.3-70b-versatile`, 100 paired items per slice, margin fixed before any data was collected.
 
 | subject | | n | local | hosted | delta | one-sided 95% CI | verdict |
 |---|---|---:|---:|---:|---:|:---:|---|
@@ -15,7 +15,7 @@ Nowhere on these eight MMLU slices. No slice establishes non-inferiority at the 
 | professional_law |  | 100 | 0.35 | 0.64 | -0.290 | [-0.377, -0.175] | below_margin |
 | high_school_psychology |  | 100 | 0.80 | 0.92 | -0.120 | [-0.179, -0.035] | inconclusive |
 
-`delta` is local accuracy minus hosted accuracy. P marks the two primary slices named before the pilot. The pre-registered claim was that at least one primary slice would clear the margin. Neither does, which is the outcome [PREREGISTRATION.md](PREREGISTRATION.md) section 15 named in advance as publishable.
+`delta` is local accuracy minus hosted accuracy. P marks the two primary slices named before the pilot. The pre-registered claim was that at least one primary slice would clear the margin. Both primary slices land below it, which is the outcome [PREREGISTRATION.md](PREREGISTRATION.md) section 15 named in advance as publishable. The three inconclusive slices are not counted against the model: the interval spans the margin there, so the study has no verdict on them either way.
 
 ```bash
 python scripts/build_map.py && python scripts/build_gsm8k.py && python scripts/build_router.py && python scripts/build_cost.py && python scripts/build_figures.py
@@ -27,9 +27,9 @@ That rebuilds every table and figure in `reports/` from `data/results.sqlite`. T
 
 **5 of 140.** On the held-out router split, 5 items had the local model right and the hosted model wrong. 50 went the other way, 70 both models answered correctly, 15 neither did. Those 5 items are the whole accuracy budget any routing policy has to work with here. Full breakdown in [reports/router.md](reports/router.md).
 
-**Oracle gap +0.0357, 95% CI [+0.0071, +0.0714].** A router with per-item knowledge of which model is right beats always-hosted by between 0.7 and 7.1 percentage points on this model pair at this sample size. That is a ceiling, not a policy: no deployable router reaches it. Paired bootstrap, 10,000 resamples by item, seed 42.
+**Oracle gap +0.0357, 95% CI [+0.0071, +0.0714].** A router with per-item knowledge of which model is right beats always-hosted by between 0.7 and 7.1 percentage points on this model pair at this sample size. That is a ceiling, not a policy: none of the four deployable policies evaluated here reaches it. Paired bootstrap, 10,000 resamples by item, seed 42.
 
-**Total study cost: $0.00 cash, $0.2550 hosted list-price-equivalent, $0.00 local incremental API spend, 10,362.9 seconds of local machine occupancy.** Collection ran on Groq's free plan, so the cash figure is zero and the list-price-equivalent is what the same 383,004 tokens would have cost at Groq's published on-demand rate. Local spend is zero metered API dollars, not zero cost. Breakdown in [reports/cost.md](reports/cost.md).
+**Total study cost: $0.2550 hosted list-price-equivalent and 10,362.9 seconds of local machine occupancy.** Those two are measured: 383,004 tokens passed through the hosted model, and $0.2550 is what they would have cost at Groq's published on-demand rate. No cash actually left an account, because collection ran under Groq's free tier, and local inference calls no metered API. Both of those zeros follow from how the study was billed rather than from anything counted, so [reports/cost.md](reports/cost.md) reports them separately from the measurements.
 
 ## What else is in reports/
 
@@ -51,7 +51,7 @@ This is a reproducible case study of two pinned deployment configurations, not a
 
 On at least one predeclared benchmark slice, the lower bound of a one-sided 95% confidence interval for `accuracy_local - accuracy_hosted` exceeds `-10 percentage points`, where the margin was fixed before any evaluation data was observed.
 
-Non-inferior nowhere is a publishable result. Non-inferior everywhere means the benchmark is too easy and is reported as such. Mostly inconclusive is the honest expected outcome at small samples and is reported with a power analysis. No outcome leaves the project with nothing to show. The full design, frozen in advance, is in [PREREGISTRATION.md](PREREGISTRATION.md).
+Non-inferiority established nowhere is a publishable result. Non-inferior everywhere means the benchmark is too easy and is reported as such. Mostly inconclusive is the honest expected outcome at small samples and is reported with a power analysis. No outcome leaves the project with nothing to show. The full design, frozen in advance, is in [PREREGISTRATION.md](PREREGISTRATION.md).
 
 ## Status
 

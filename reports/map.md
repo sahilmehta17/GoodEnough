@@ -24,6 +24,10 @@ delta = local accuracy minus hosted accuracy. CI is the one-sided 95% bound. Ver
 P marks the two primary slices named before data collection.
 
 
+Across the 8 slices at the 10 point margin: 0 establish non-inferiority, 5 fall below the margin, and 3 are inconclusive at n = 100.
+Inconclusive means the interval spans the margin, so the data cannot decide those slices in either direction. It is not a finding that the local model is worse there (PREREGISTRATION.md section 7).
+
+
 ## Sensitivity to the margin
 
 The primary margin is 0.10. PREREGISTRATION.md section 3 also asks for 5 and 15 points. Same interval per slice, reclassified; nothing is re-estimated.

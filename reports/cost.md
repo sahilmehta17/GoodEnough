@@ -1,15 +1,22 @@
 # Cost
 
-## Project totals (every dataset and split evaluated so far)
+## Measured totals (every dataset and split evaluated so far)
 
-| quantity | value |
-|---|---:|
-| actual cash spent | $0.00 |
-| hosted list-price-equivalent | $0.2550 |
-| local incremental API spend | $0.00 |
-| local machine occupancy (seconds) | 10362.9 |
+Everything in this table is counted from the results database.
 
-Hosted calls counted: 1,561 (237,655 input tokens, 145,349 output tokens). Actual cash spent is zero because collection runs on Groq's free plan; the list-price-equivalent is what those same tokens would cost at Groq's published on-demand rate. Local incremental API spend is zero by construction, not because local inference has no cost; it is not economically free, it draws no metered API dollars.
+| quantity | value | what it counts |
+|---|---:|---|
+| hosted tokens consumed | 383,004 | 237,655 input and 145,349 output, over 1,561 uncached hosted calls |
+| hosted list-price-equivalent | $0.2550 | those tokens priced at Groq's published on-demand rate, $0.59 per 1M input and $0.79 per 1M output, read 2026-08-06 |
+| local machine occupancy | 10,362.9 s | summed end-to-end wall clock of every uncached local call |
+| local incremental API spend | $0.0000 | local token volume priced at the pinned local rate |
+
+### Two quantities that are not measurements
+
+**Cash outlay: none.** Collection ran under Groq's free tier, so no metered charge was incurred and no money left an account. That zero is a property of the billing plan, not something counted in this database, and it is stated here rather than placed in the table above. The measurement is the list-price-equivalent: 383,004 tokens really did pass through the hosted model, and $0.2550 is what they would have cost at the published rate had they been billed.
+
+
+**Local incremental API spend: $0.0000.** The pinned local rate is $0.00 per 1M tokens because local inference calls no metered API, so this figure is zero by construction rather than by measurement. It is not a finding that local inference is free. The local cost this study did measure is the occupancy row above: 10,362.9 s of a laptop that could not be doing anything else. Electricity and hardware amortization are out of scope (PREREGISTRATION.md section 14).
 
 
 ## Latency inversion

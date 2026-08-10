@@ -31,6 +31,7 @@ Things that are explicitly OUT of scope and must not be built:
 - A web dashboard
 - Full OpenAI API compatibility beyond the fields the runner actually uses
 - Any additional dataset, model, or provider
+- Any new data collection before the 29 August submission. Collection is closed. Every remaining task is reporting, prose, or the proxy.
 
 ---
 
@@ -38,11 +39,13 @@ Things that are explicitly OUT of scope and must not be built:
 
 The HTTP layer is the easy part. The risk is in model invocation, prompt formatting, token limits, parsing, caching, quota behavior, and reproducible scoring. Surface those on day one.
 
-**Done.** One vertical slice with no HTTP (single paired item, local + hosted, scored). Cache and replay keyed on `model + prompt + sampling params + seed`, token counts, end-to-end latency, SQLite persistence. The tripwire passed: a paired benchmark item round-trips through the complete measurement path and reproduces exactly from cache. The full resumable, budget-aware runner. The public repo, `PREREGISTRATION.md`, and the split file, committed before any evaluation call. The dev split, parser, discordance estimate, 3-seed variance check, required-n computation, frozen slice count. Loader, scorer, WAL store, analysis engine, and the map/GSM8K/router builders. Local evaluation across every split.
+**Done.** One vertical slice with no HTTP (single paired item, local + hosted, scored). Cache and replay keyed on `model + prompt + sampling params + seed`, token counts, end-to-end latency, SQLite persistence. The tripwire passed: a paired benchmark item round-trips through the complete measurement path and reproduces exactly from cache. The full resumable, budget-aware runner. The public repo, `PREREGISTRATION.md`, and the split file, committed before any evaluation call. The dev split, parser, discordance estimate, 3-seed variance check, required-n computation, frozen slice count. Loader, scorer, WAL store, analysis engine, and the map/GSM8K/router/cost/figure builders.
 
-**In progress.** Hosted evaluation against Groq, resuming across days as the token budget resets.
+**Data collection is closed.** Local and hosted evaluation are complete across every split: MMLU dev 421, map 800, router 140; GSM8K dev 50, map 150. Nothing further is collected before submission.
 
-**Remaining.** Finish the map once hosted data is complete: intervals, three-status classification, chart, GSM8K step-count slope (secondary and cuttable). Then the proxy, router policy evaluation, and writeup.
+**Done, generated from the finished database.** The MMLU map with intervals and three-status classification, margin sensitivity at 5/10/15, unparseable rate per subject per model, the difficulty correlation, the GSM8K step-count slope, the router item breakdown and oracle gap with interval, the cost and latency accounting, and the four paper figures. All of `reports/` rebuilds from `data/results.sqlite` and is byte-stable across rebuilds.
+
+**Remaining.** The proxy, and the writeup. Nothing else.
 
 > **TRIPWIRE (historical, already satisfied).** By end of the caching milestone, one paired benchmark item had to round-trip through the complete measurement path and reproduce exactly from cache. Not a proxy request. A scored paired row. It did. Kept here as a record of what was checked, not as an open gate.
 
@@ -103,7 +106,7 @@ run_date, seed
 - Three statuses per slice: non-inferior / below margin / inconclusive
 - Two primary slices carry the headline. The other six are exploratory with unadjusted intervals.
 
-Do not compute a headline cost ratio. Report four separate quantities: actual cash spent, hosted list-price-equivalent, local incremental API spend ($0), and local machine occupancy in wall-clock seconds.
+Do not compute a headline cost ratio. Report four separate quantities: actual cash spent, hosted list-price-equivalent, local incremental API spend ($0), and local machine occupancy in wall-clock seconds. Two of those are measurements and two are not: cash outlay follows from the billing plan and local API spend from a pinned $0 rate. `reports/cost.md` keeps them in separate sections for that reason. Do not put a number in a measured table that was not counted.
 
 ---
 
@@ -119,9 +122,9 @@ p95 from 100 requests is set by five observations. Per-slice latency is descript
 
 ## Definition of done
 
-**Floor (nearly done).** Public repo, map over at least 6 slices with intervals and three-status classification, README explaining it. The MMLU map is generated (`reports/map.md`); GSM8K's slope analysis and the pooled cost/latency numbers are the remaining pieces once hosted evaluation finishes. **If only this ships, the project succeeded.**
+**Floor: met.** Public repo, map over 8 slices with intervals and three-status classification (`reports/map.md`), README explaining it, GSM8K slope analysis, and the pooled cost/latency numbers. **This shipped, so the project succeeded.**
 
-**Stretch (remaining).** The above plus four routing policies, oracle bound, held-out evaluation, full writeup with the manifest.
+**Stretch: met except the writeup.** Four routing policies, the oracle bound with an interval, and held-out evaluation are all in `reports/router.md`. The full writeup with the manifest is what remains.
 
 **If behind:** cut slices, cut GSM8K, cut the cascade policy. **Never cut** the frozen splits, the predeclared margin, or the confidence intervals. Those are the entire value of the project.
 

@@ -245,6 +245,38 @@ def build(db_path: str):
     return report
 
 
+def _status_distribution(report: dict) -> list[str]:
+    """
+    How the slices landed across the three mandated statuses (section 7).
+
+    Stated as three counts, never as one negative. 'Below margin' is a
+    determination that the local model is worse by more than the margin.
+    'Inconclusive' is the absence of a determination in either direction.
+    Collapsing the two into a single "failed everywhere" reads the inconclusive
+    slices as losses, which is exactly what the three-status classification
+    exists to prevent.
+    """
+    slices = [s for s in report["map_slices"] if s.get("verdict") != "no_data"]
+    if not slices:
+        return []
+    counts = {v: sum(1 for s in slices if s["verdict"] == v)
+              for v in ("non_inferior", "below_margin", "inconclusive")}
+    margin_pp = report["margin"] * 100.0
+    ns = sorted({s["n"] for s in slices})
+    n_phrase = f"n = {ns[0]}" if len(ns) == 1 else f"n = {ns[0]} to {ns[-1]}"
+
+    lines = [f"\nAcross the {len(slices)} slices at the {margin_pp:.0f} point margin: "
+             f"{counts['non_inferior']} establish non-inferiority, "
+             f"{counts['below_margin']} fall below the margin, and "
+             f"{counts['inconclusive']} are inconclusive at {n_phrase}."]
+    if counts["inconclusive"]:
+        lines.append(
+            "Inconclusive means the interval spans the margin, so the data cannot "
+            "decide those slices in either direction. It is not a finding that the "
+            "local model is worse there (PREREGISTRATION.md section 7).\n")
+    return lines
+
+
 def _sensitivity_section(report: dict) -> list[str]:
     """Verdict for every slice at each predeclared margin (section 3)."""
     rows = report.get("map_sensitivity") or []
@@ -406,6 +438,7 @@ def write_reports(report: dict):
             f"{s['acc_hosted']:.2f} | {s['delta']:+.3f} | "
             f"[{s['ci_lower']:+.3f}, {s['ci_upper']:+.3f}] | **{s['verdict']}** |")
     lines.append("\nP marks the two primary slices named before data collection.\n")
+    lines.extend(_status_distribution(report))
 
     lines.extend(_sensitivity_section(report))
     lines.extend(_unparseable_section(report))

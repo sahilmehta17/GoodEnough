@@ -147,6 +147,26 @@ def write_reports(result: dict):
             "reports/gsm8k.json flagged `slope_interpretable: false`, and it should "
             "not be read as an estimate.\n")
 
+    # The floor is a post-hoc analysis decision. Disclose it in the report itself
+    # so a reader does not have to open the pre-registration to find out.
+    unaffected = []
+    for role in ("local", "hosted"):
+        m = result["models"].get(role, {})
+        if m.get("n") and m.get("slope_interpretable"):
+            unaffected.append((role, min(m["n_correct"], m["n_incorrect"])))
+    if any(result["models"].get(r, {}).get("n") for r in ("local", "hosted")):
+        clears = "; ".join(f"{role} has {k} and clears it" for role, k in unaffected)
+        lines.append(
+            f"\n**Disclosure.** The {MIN_MINORITY_OUTCOMES}-response floor used above "
+            "was not pre-registered. It was chosen after data collection, once the "
+            "hosted fit was seen to be near separable, so it is a post-hoc analysis "
+            "decision (recorded in the PREREGISTRATION.md amendment log). It is applied "
+            "identically to both models rather than to hosted alone, and it is a rule "
+            "about how many responses fall in the rarer outcome, not about which model "
+            "produced them."
+            + (f" It changes no reported slope for the models that meet it: {clears}.\n"
+               if unaffected else "\n"))
+
     # Accuracy-by-steps table, both models side by side
     all_steps = set()
     for role in ("local", "hosted"):

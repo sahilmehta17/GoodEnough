@@ -10,9 +10,15 @@ latency to each item the policy already decided to route.
 
 Also reports a project-wide cost sanity check: total hosted dollars spent
 across every dataset and split evaluated so far, independent of the router
-split or any policy, plus the four quantities CLAUDE.md asks for (actual
-cash spent, hosted list-price-equivalent, local incremental spend, local
-machine occupancy).
+split or any policy.
+
+Four quantities are reported and they are not the same kind of thing, so the
+report separates them. Hosted list-price-equivalent and local machine
+occupancy are measured from the database. Cash outlay is a property of the
+billing plan, so it is stated in prose and is deliberately not carried as a
+constant in the totals dict. Local incremental API spend is computed, but its
+zero comes from a pinned rate of $0 per 1M tokens rather than from anything
+observed, so the report says so where it appears.
 
 Writes reports/cost.md and reports/cost.json. Read-only on the database, so
 it is safe to run while collection continues. A router split with no paired
@@ -253,9 +259,12 @@ def build(db_path: str) -> dict:
         econ = {k: policy_economics(k, v, metrics, all_ids) for k, v in policies.items()}
         router_result = {"n": router_n, "policies": policies, "economics": econ}
 
+    # Cash actually leaving an account is deliberately absent here. It is not a
+    # measurement this database can make: it is a property of the billing plan.
+    # The report states it in prose instead of carrying it as a constant that
+    # would sit in a table looking like something that was counted.
     project_totals = project_hosted_totals(conn)
     project_totals["local_machine_occupancy_seconds"] = project_local_occupancy_seconds(conn)
-    project_totals["actual_cash_spent_usd"] = 0.0  # Groq free plan
     project_totals["local_incremental_api_spend_usd"] = project_local_incremental_spend(conn)
 
     inversion = latency_inversion(pooled_latency_medians(conn))
@@ -283,23 +292,47 @@ def write_reports(report: dict):
     lines = ["# Cost\n"]
 
     pt = report["project_totals"]
-    lines.append("## Project totals (every dataset and split evaluated so far)\n")
-    lines.append("| quantity | value |")
-    lines.append("|---|---:|")
-    lines.append(f"| actual cash spent | ${pt['actual_cash_spent_usd']:.2f} |")
-    lines.append(f"| hosted list-price-equivalent | ${pt['hosted_list_price_equivalent_usd']:.4f} |")
-    lines.append(f"| local incremental API spend | ${pt['local_incremental_api_spend_usd']:.2f} |")
+    pr = report["pricing"]
+    tokens = pt["total_input_tokens"] + pt["total_output_tokens"]
     occ = pt["local_machine_occupancy_seconds"]
-    occ_s = f"{occ:.1f}" if occ is not None else "not yet available"
-    lines.append(f"| local machine occupancy (seconds) | {occ_s} |")
-    lines.append(f"\nHosted calls counted: {pt['hosted_calls']:,} "
-                 f"({pt['total_input_tokens']:,} input tokens, "
-                 f"{pt['total_output_tokens']:,} output tokens). Actual cash spent is "
-                 "zero because collection runs on Groq's free plan; the list-price-"
-                 "equivalent is what those same tokens would cost at Groq's published "
-                 "on-demand rate. Local incremental API spend is zero by construction, "
-                 "not because local inference has no cost; it is not economically free, "
-                 "it draws no metered API dollars.\n")
+    occ_s = f"{occ:,.1f} s" if occ is not None else "not yet available"
+
+    lines.append("## Measured totals (every dataset and split evaluated so far)\n")
+    lines.append("Everything in this table is counted from the results database.\n")
+    lines.append("| quantity | value | what it counts |")
+    lines.append("|---|---:|---|")
+    lines.append(f"| hosted tokens consumed | {tokens:,} | "
+                 f"{pt['total_input_tokens']:,} input and {pt['total_output_tokens']:,} "
+                 f"output, over {pt['hosted_calls']:,} uncached hosted calls |")
+    lines.append(f"| hosted list-price-equivalent | "
+                 f"${pt['hosted_list_price_equivalent_usd']:.4f} | those tokens priced at "
+                 f"Groq's published on-demand rate, ${pr['hosted_input_per_m_usd']:.2f} "
+                 f"per 1M input and ${pr['hosted_output_per_m_usd']:.2f} per 1M output, "
+                 f"read {pr['date_read']} |")
+    lines.append(f"| local machine occupancy | {occ_s} | summed end-to-end wall clock of "
+                 "every uncached local call |")
+    lines.append(f"| local incremental API spend | "
+                 f"${pt['local_incremental_api_spend_usd']:.4f} | local token volume "
+                 "priced at the pinned local rate |")
+
+    lines.append("\n### Two quantities that are not measurements\n")
+    lines.append(
+        f"**Cash outlay: none.** Collection ran under Groq's free tier, so no metered "
+        f"charge was incurred and no money left an account. That zero is a property of "
+        f"the billing plan, not something counted in this database, and it is stated "
+        f"here rather than placed in the table above. The measurement is the "
+        f"list-price-equivalent: {tokens:,} tokens really did pass through the hosted "
+        f"model, and ${pt['hosted_list_price_equivalent_usd']:.4f} is what they would "
+        f"have cost at the published rate had they been billed.\n")
+    lines.append(
+        f"\n**Local incremental API spend: "
+        f"${pt['local_incremental_api_spend_usd']:.4f}.** The pinned local rate is "
+        f"${config.LOCAL_PRICE_INPUT_PER_M:.2f} per 1M tokens because local inference "
+        "calls no metered API, so this figure is zero by construction rather than by "
+        "measurement. It is not a finding that local inference is free. The local cost "
+        f"this study did measure is the occupancy row above: {occ_s} of a laptop that "
+        "could not be doing anything else. Electricity and hardware amortization are "
+        "out of scope (PREREGISTRATION.md section 14).\n")
 
     inv = report["latency_inversion"]
     lines.append("\n## Latency inversion\n")
