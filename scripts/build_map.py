@@ -472,7 +472,11 @@ def _correlation_section(report: dict) -> list[str]:
 
 def write_reports(report: dict):
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    with open(os.path.join(REPORTS_DIR, "map.json"), "w", encoding="utf-8") as fh:
+    # newline="\n" on both writes below: reports go out with LF on every
+    # platform, matching .gitattributes (eol=lf). Without it Windows writes CRLF
+    # and a rebuild in a fresh clone shows every report as modified in git status
+    # with no content change.
+    with open(os.path.join(REPORTS_DIR, "map.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(report, fh, indent=2)
 
     lines = []
@@ -522,7 +526,7 @@ def write_reports(report: dict):
     lines.append("\nLocal token cost is zero incremental API spend; the tokens column "
                  "for local reflects local compute only, not money.\n")
 
-    with open(os.path.join(REPORTS_DIR, "map.md"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(REPORTS_DIR, "map.md"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines))
 
 

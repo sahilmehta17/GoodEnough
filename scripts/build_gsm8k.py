@@ -127,7 +127,11 @@ def build(db_path: str):
 
 def write_reports(result: dict):
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    with open(os.path.join(REPORTS_DIR, "gsm8k.json"), "w", encoding="utf-8") as fh:
+    # newline="\n" on both writes below: reports go out with LF on every
+    # platform, matching .gitattributes (eol=lf). Without it Windows writes CRLF
+    # and a rebuild in a fresh clone shows every report as modified in git status
+    # with no content change.
+    with open(os.path.join(REPORTS_DIR, "gsm8k.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(result, fh, indent=2)
 
     lines = ["# GSM8K difficulty\n",
@@ -219,7 +223,7 @@ def write_reports(result: dict):
             ha = f"{hm['acc']:.2f}" if hm else "-"
             lines.append(f"| {s} | {ln} | {la} | {hn} | {ha} |")
 
-    with open(os.path.join(REPORTS_DIR, "gsm8k.md"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(REPORTS_DIR, "gsm8k.md"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines))
 
 

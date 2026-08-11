@@ -287,7 +287,11 @@ def build(db_path: str) -> dict:
 
 def write_reports(report: dict):
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    with open(os.path.join(REPORTS_DIR, "cost.json"), "w", encoding="utf-8") as fh:
+    # newline="\n" on both writes below: reports go out with LF on every
+    # platform, matching .gitattributes (eol=lf). Without it Windows writes CRLF
+    # and a rebuild in a fresh clone shows every report as modified in git status
+    # with no content change.
+    with open(os.path.join(REPORTS_DIR, "cost.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(report, fh, indent=2)
 
     lines = ["# Cost\n"]
@@ -370,7 +374,7 @@ def write_reports(report: dict):
         lines.append("\nOracle has no cost or latency: it is a perfect-knowledge upper "
                      "bound on accuracy, not a deployable policy.\n")
 
-    with open(os.path.join(REPORTS_DIR, "cost.md"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(REPORTS_DIR, "cost.md"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines))
 
 

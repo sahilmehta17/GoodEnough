@@ -237,7 +237,11 @@ def _oracle_gap_section(report: dict) -> list[str]:
 
 def write_reports(report: dict):
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    with open(os.path.join(REPORTS_DIR, "router.json"), "w", encoding="utf-8") as fh:
+    # newline="\n" on both writes below: reports go out with LF on every
+    # platform, matching .gitattributes (eol=lf). Without it Windows writes CRLF
+    # and a rebuild in a fresh clone shows every report as modified in git status
+    # with no content change.
+    with open(os.path.join(REPORTS_DIR, "router.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(report, fh, indent=2)
 
     lines = ["# Router policies\n"]
@@ -269,7 +273,7 @@ def write_reports(report: dict):
             extra += f" (escalated {p[k]['escalation_rate']*100:.0f}%)"
         lines.append(f"| {k} | {p[k]['accuracy']:.3f} | {hc_s} | {extra} |")
 
-    with open(os.path.join(REPORTS_DIR, "router.md"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(REPORTS_DIR, "router.md"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines))
 
 

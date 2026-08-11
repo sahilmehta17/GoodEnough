@@ -283,8 +283,12 @@ def render_fig4(rows: list[dict], csv_path: str, pdf_path: str):
 # --------------------------------------------------------------------------
 
 def _write_csv(path: str, rows: list[dict], columns: list[str]):
+    # newline="" stops Python translating, then lineterminator pins LF. The csv
+    # module defaults to CRLF, which on Windows disagrees with .gitattributes
+    # (eol=lf): a rebuild in a fresh clone rewrote every CSV with CRLF and left
+    # three files showing as modified in git status with no content change.
     with open(path, "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=columns)
+        writer = csv.DictWriter(fh, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
         for r in rows:
             writer.writerow({c: r.get(c) for c in columns})
