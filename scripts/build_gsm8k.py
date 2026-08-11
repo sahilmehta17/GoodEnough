@@ -62,7 +62,8 @@ INTERVAL_LABEL_SHORT = "two-sided 90%"
 
 def build(db_path: str):
     if not os.path.exists(db_path):
-        print(f"No database at {db_path}.")
+        print(f"No database at {db_path}; skipping. See reports/ for the "
+              "committed results (README, Reproduce).")
         return None
 
     steps_by_item = {it.item_id: it.gold_steps for it in loader.load_frozen("gsm8k", "map")}
@@ -229,7 +230,10 @@ def main() -> int:
 
     result = build(args.db)
     if result is None:
-        return 1
+        # Missing database is the expected state in a fresh clone, not a
+        # failure. Exit 0 so the README's one-command rebuild does not die
+        # at the first builder and skip the remaining four.
+        return 0
     write_reports(result)
     for role in ("local", "hosted"):
         m = result["models"].get(role, {})

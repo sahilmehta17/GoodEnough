@@ -244,7 +244,8 @@ def latency_inversion(medians: dict) -> dict | None:
 
 def build(db_path: str) -> dict:
     if not os.path.exists(db_path):
-        print(f"No database at {db_path}.")
+        print(f"No database at {db_path}; skipping. See reports/ for the "
+              "committed results (README, Reproduce).")
         return None
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
@@ -380,7 +381,10 @@ def main() -> int:
 
     report = build(args.db)
     if report is None:
-        return 1
+        # Missing database is the expected state in a fresh clone, not a
+        # failure. Exit 0 so the README's one-command rebuild does not die
+        # at the first builder and skip the remaining four.
+        return 0
     write_reports(report)
 
     pt = report["project_totals"]

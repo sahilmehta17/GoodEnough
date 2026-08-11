@@ -196,8 +196,23 @@ def freeze_mmlu(dry_run: bool):
         _write_jsonl(os.path.join(FROZEN_DIR, "mmlu_map.jsonl"), map_rows)
         _write_jsonl(os.path.join(FROZEN_DIR, "mmlu_router.jsonl"), router_rows)
 
-    return {"per_subject": counts,
-            "totals": {"dev": len(dev_rows), "map": len(map_rows), "router": len(router_rows)}}
+    if dry_run:
+        # The dry-run path counts without building rows, so dev_rows/map_rows/
+        # router_rows are all empty here and reporting len() on them printed
+        # "dev=0 map=0 router=0" directly under a per-subject table showing
+        # map=100 eight times. Derive the totals from the counts instead. The
+        # router cap is applied the same way the real path applies it below, so
+        # the dry run predicts what a freeze would actually write.
+        router_pool_n = sum(c["router_candidate"] for c in counts.values())
+        totals = {
+            "dev": sum(c["validation_available"] for c in counts.values()),
+            "map": sum(c["map"] for c in counts.values()),
+            "router": min(router_pool_n, dc.MMLU_ROUTER_TOTAL_CAP),
+        }
+    else:
+        totals = {"dev": len(dev_rows), "map": len(map_rows), "router": len(router_rows)}
+
+    return {"per_subject": counts, "totals": totals}
 
 
 def freeze_gsm8k(dry_run: bool):

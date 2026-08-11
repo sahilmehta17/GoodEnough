@@ -217,7 +217,10 @@ def cost_latency(conn, dataset: str, split: str):
 
 def build(db_path: str):
     if not os.path.exists(db_path):
-        print(f"No database at {db_path}. Run scripts/run_eval.py first.")
+        print(f"No database at {db_path}; skipping. data/results.sqlite is not "
+              "committed, so a fresh clone has none. The committed results in "
+              "reports/ are current and readable as they are. To regenerate them, "
+              "collect the data first with scripts/run_eval.py (README, Reproduce).")
         return None
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
@@ -530,7 +533,10 @@ def main() -> int:
 
     report = build(args.db)
     if report is None:
-        return 1
+        # Missing database is the expected state in a fresh clone, not a
+        # failure. Exit 0 so the README's one-command rebuild does not die
+        # at the first builder and skip the remaining four.
+        return 0
     write_reports(report)
 
     # Console summary
