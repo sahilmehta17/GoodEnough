@@ -42,6 +42,23 @@ REPORTS_DIR = os.path.join(os.path.dirname(__file__), "..", "reports")
 # a number. Applied identically to local and hosted.
 MIN_MINORITY_OUTCOMES = 5
 
+# Bootstrap for the logistic slope. PREREGISTRATION.md section 8 fixes the
+# paired bootstrap at 10,000 resamples with a fixed seed, so the slope uses the
+# same three numbers rather than analysis.bootstrap_slope's smaller default.
+# tail=0.05 puts a one-sided 95% bound at each end; the two ends together are a
+# two-sided 90% interval. Same numbers either way, which is why the convention
+# has to be stated wherever the interval is printed.
+BOOTSTRAP_ITERS = 10000
+BOOTSTRAP_SEED = 42
+BOOTSTRAP_TAIL = 0.05
+
+# Printed wherever a slope interval appears, so the level and the sidedness
+# travel with the numbers instead of having to be inferred. The long form
+# carries the equivalence and goes in prose; the short form fits a table header,
+# where the prose directly above it supplies the equivalence.
+INTERVAL_LABEL = "two-sided 90%, equivalently one-sided 95% bounds"
+INTERVAL_LABEL_SHORT = "two-sided 90%"
+
 
 def build(db_path: str):
     if not os.path.exists(db_path):
@@ -74,7 +91,8 @@ def build(db_path: str):
             result["models"][role] = {"n": 0}
             continue
         b0, slope = analysis.logistic_fit(d["steps"], d["correct"])
-        ci = analysis.bootstrap_slope(d["steps"], d["correct"])
+        ci = analysis.bootstrap_slope(d["steps"], d["correct"], iters=BOOTSTRAP_ITERS,
+                                      seed=BOOTSTRAP_SEED, tail=BOOTSTRAP_TAIL)
         n = len(d["steps"])
         n_correct = sum(d["correct"])
         n_incorrect = n - n_correct
@@ -87,6 +105,10 @@ def build(db_path: str):
             "n_incorrect": n_incorrect,
             "slope_per_step": slope,
             "slope_ci": [ci["lower"], ci["upper"]],
+            "slope_ci_convention": INTERVAL_LABEL,
+            "slope_ci_tail": BOOTSTRAP_TAIL,
+            "bootstrap_iters": BOOTSTRAP_ITERS,
+            "bootstrap_seed": BOOTSTRAP_SEED,
             # The slope stays in the JSON either way. This flag says whether it
             # may be read as an estimate; reports/gsm8k.md honours it.
             "slope_interpretable": interpretable,
@@ -112,8 +134,17 @@ def write_reports(result: dict):
              "Slope is the change in log-odds of a correct answer per extra step; "
              "a more negative slope means faster degradation.\n"]
 
-    lines.append("| model | n | correct | incorrect | overall acc | slope per step "
-                 "| 90% CI |")
+    lines.append(
+        f"\n**Interval convention.** Each slope interval below is {INTERVAL_LABEL}. "
+        "Those are two descriptions of one computation, not two computations: the "
+        f"bootstrap takes the {BOOTSTRAP_TAIL:.0%} and "
+        f"{1.0 - BOOTSTRAP_TAIL:.0%} percentiles of the resampled slopes, so each end "
+        "is a one-sided 95% bound and the pair spans a two-sided 90% interval. The "
+        "one-sided reading is the level PREREGISTRATION.md section 8 fixes. "
+        f"{BOOTSTRAP_ITERS:,} resamples by item, seed {BOOTSTRAP_SEED}.\n")
+
+    lines.append(f"\n| model | n | correct | incorrect | overall acc | slope per step "
+                 f"| {INTERVAL_LABEL_SHORT} CI |")
     lines.append("|---|---:|---:|---:|---:|---:|:---:|")
     for role in ("local", "hosted"):
         m = result["models"].get(role, {})
@@ -211,7 +242,8 @@ def main() -> int:
             print(f"{head} slope=not estimable (too few errors)")
             continue
         lo, hi = m["slope_ci"]
-        print(f"{head} slope/step={m['slope_per_step']:+.3f} CI=[{lo:+.3f},{hi:+.3f}]")
+        print(f"{head} slope/step={m['slope_per_step']:+.3f} "
+              f"CI=[{lo:+.3f},{hi:+.3f}] ({INTERVAL_LABEL})")
     print("\nWrote reports/gsm8k.md and reports/gsm8k.json")
     return 0
 

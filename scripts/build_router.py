@@ -38,12 +38,22 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "results.sqlite"
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), "..", "reports")
 MARGIN = 0.10
 
-# Paired bootstrap for the oracle gap, matching PREREGISTRATION.md section 8:
-# resampled by item, 10,000 resamples, fixed seed. tail=0.025 makes the reported
-# interval a two-sided 95%.
+# Paired bootstrap for the oracle gap: resampled by item, 10,000 resamples,
+# fixed seed. tail=0.025 makes the reported interval a two-sided 95%.
+#
+# This does NOT match PREREGISTRATION.md section 8, and an earlier version of
+# this comment wrongly claimed it did. Section 8 fixes the paired bootstrap at
+# one-sided 95% (tail=0.05) as the cross-check on the per-slice non-inferiority
+# delta, and that is what analysis.slice_result still uses. The oracle gap is a
+# different quantity: section 13 mandates it only as an upper bound and assigns
+# it no level, so it is post-hoc, has no privileged direction, and is reported
+# two-sided at 95%. Same function, deliberately different tail.
 BOOTSTRAP_ITERS = 10000
 BOOTSTRAP_SEED = 42
 BOOTSTRAP_TAIL = 0.025
+
+# Printed next to the numbers so the level and sidedness travel with them.
+INTERVAL_LABEL = "two-sided 95%"
 
 
 def subject_of(item_id: str) -> str:
@@ -121,6 +131,8 @@ def oracle_gap(items: list[dict]) -> dict | None:
         "gap": (sum(oracle) - sum(hosted)) / n,
         "ci_lower": boot["lower"],
         "ci_upper": boot["upper"],
+        "ci_convention": INTERVAL_LABEL,
+        "ci_tail": BOOTSTRAP_TAIL,
         "n": n,
         "bootstrap_iters": BOOTSTRAP_ITERS,
         "bootstrap_seed": BOOTSTRAP_SEED,
@@ -200,10 +212,18 @@ def _oracle_gap_section(report: dict) -> list[str]:
     lines = ["\n## Oracle gap over always-hosted\n"]
     lines.append(
         f"Oracle accuracy {g['oracle_accuracy']:.3f} minus always-hosted accuracy "
-        f"{g['always_hosted_accuracy']:.3f} = **{g['gap']:+.4f}**, 95% paired bootstrap "
-        f"CI [{g['ci_lower']:+.4f}, {g['ci_upper']:+.4f}] "
+        f"{g['always_hosted_accuracy']:.3f} = **{g['gap']:+.4f}**, "
+        f"{INTERVAL_LABEL} paired bootstrap CI "
+        f"[{g['ci_lower']:+.4f}, {g['ci_upper']:+.4f}] "
         f"({g['bootstrap_iters']:,} resamples by item, seed {g['bootstrap_seed']}, "
         f"n = {g['n']}).\n")
+    lines.append(
+        f"\nThat interval is {INTERVAL_LABEL}, not the one-sided 95% used for the "
+        "per-slice non-inferiority intervals in reports/map.md. The oracle gap is not "
+        "named in PREREGISTRATION.md section 8; section 13 mandates it only as an "
+        "upper bound and fixes no level for it. It is a post-hoc quantity with no "
+        "privileged direction to test against, so it is reported two-sided. "
+        "reports/map.md carries the full convention for both classes.\n")
     lines.append(
         f"\nThe oracle needs per-item knowledge of which model is right, so it is a "
         "ceiling rather than a policy. On this model pair at this sample size, the "
@@ -271,7 +291,7 @@ def main() -> int:
     g = report["oracle_gap"]
     if g:
         print(f"  oracle - always_hosted = {g['gap']:+.4f} "
-              f"CI=[{g['ci_lower']:+.4f},{g['ci_upper']:+.4f}]")
+              f"CI=[{g['ci_lower']:+.4f},{g['ci_upper']:+.4f}] ({INTERVAL_LABEL})")
     for k, v in report["policies"].items():
         hc = "-" if v["hosted_calls"] is None else v["hosted_calls"]
         print(f"  {k:14} acc={v['accuracy']:.3f} hosted_calls={hc}")

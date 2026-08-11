@@ -143,7 +143,16 @@ def paired_binary_interval(local: list[int], hosted: list[int], tail: float = 0.
 
 def bootstrap_paired(local: list[int], hosted: list[int], iters: int = 10000,
                      seed: int = 42, tail: float = 0.05) -> dict:
-    """Paired bootstrap cross-check: resample items, recompute delta."""
+    """
+    Paired bootstrap cross-check: resample items, recompute delta.
+
+    tail is per end. tail=0.05, the default and what the pre-registered
+    cross-check uses, returns a one-sided 95% bound at each end (equivalently a
+    two-sided 90% interval). Callers wanting a two-sided 95% interval pass
+    tail=0.025; scripts/build_router.py does exactly that for the oracle gap,
+    which is a post-hoc quantity rather than the section 8 cross-check. Whatever
+    a caller passes, it must be labelled where the numbers are printed.
+    """
     n = len(local)
     if n == 0:
         return {"lower": 0.0, "upper": 0.0}
@@ -275,7 +284,14 @@ def logistic_fit(xs: list[float], ys: list[int], iters: int = 60) -> tuple[float
 
 def bootstrap_slope(xs: list[float], ys: list[int], iters: int = 2000,
                     seed: int = 42, tail: float = 0.05) -> dict:
-    """Bootstrap CI for the logistic slope (resample items, refit)."""
+    """
+    Bootstrap CI for the logistic slope (resample items, refit).
+
+    tail is per end, so tail=0.05 returns a one-sided 95% bound at each end,
+    equivalently a two-sided 90% interval. iters defaults low because refitting
+    is the expensive part; scripts/build_gsm8k.py passes 10,000 to match the
+    resample count PREREGISTRATION.md section 8 fixes for the paired bootstrap.
+    """
     n = len(xs)
     if n == 0:
         return {"lower": None, "upper": None}
@@ -311,6 +327,15 @@ def verdict(lower: float, upper: float, margin: float) -> str:
     """
     Three-way classification at a non-inferiority margin (e.g. 0.10).
     lower/upper are the one-sided 95% bounds on delta = p_local - p_hosted.
+
+    Both bounds are used, and they are two different one-sided tests.
+    'non_inferior' comes off the lower bound, which is the pre-registered
+    one-sided 95% test (PREREGISTRATION.md sections 2, 8). 'below_margin' comes
+    off the upper bound, a second one-sided 95% test in the opposite direction
+    that section 8 does not name. Each arm is at one-sided 95%; the classifier
+    as a whole is therefore a two-sided 90% procedure. Section 7 mandates the
+    three statuses without fixing a level for the below-margin arm, so this sits
+    inside the pre-registration. reports/map.md says so in the report itself.
     """
     if lower > -margin:
         return "non_inferior"

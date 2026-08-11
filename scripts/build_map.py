@@ -43,12 +43,23 @@ MARGIN = 0.10  # PREREGISTRATION.md section 3
 # analysis.verdict; only the margin moves.
 SENSITIVITY_MARGINS = [0.05, 0.10, 0.15]
 
-# Bootstrap settings for the difficulty correlation, matching the paired
-# bootstrap used elsewhere: 10,000 resamples, fixed seed. tail=0.025 makes the
-# reported interval a two-sided 95%.
+# Bootstrap settings for the difficulty correlation: 10,000 resamples, fixed
+# seed. tail=0.025 makes the reported interval a two-sided 95%.
+#
+# That is deliberately NOT the level used for the per-slice intervals above it.
+# The difficulty correlation is not named in the pre-registration, so it is a
+# post-hoc quantity with no privileged direction, and a two-sided interval is
+# the right shape for it. The per-slice intervals are pre-registered and
+# directional, so they stay at one-sided 95% per bound. Both conventions are
+# printed wherever they are used; see INTERVAL_CONVENTION below.
 BOOTSTRAP_ITERS = 10000
 BOOTSTRAP_SEED = 42
 BOOTSTRAP_TAIL = 0.025
+
+# Labels printed next to the numbers, so a reader never has to infer a level or
+# a sidedness from the code.
+PRIMARY_INTERVAL_LABEL = "one-sided 95% bounds"
+EXPLORATORY_INTERVAL_LABEL = "two-sided 95%"
 
 # A subject is called out in the unparseable prose only above this rate. Below
 # it the count is still in the table; this only decides what gets a sentence.
@@ -173,6 +184,8 @@ def difficulty_correlation(slices: list[dict]) -> dict | None:
         "r": r,
         "ci_lower": lo,
         "ci_upper": hi,
+        "ci_convention": EXPLORATORY_INTERVAL_LABEL,
+        "ci_tail": BOOTSTRAP_TAIL,
         "n_slices": len(scored),
         "bootstrap_iters": BOOTSTRAP_ITERS,
         "bootstrap_seed": BOOTSTRAP_SEED,
@@ -240,9 +253,53 @@ def build(db_path: str):
         "map_unparseable": unparseable_rates(conn, "mmlu", "map"),
         "difficulty_correlation": difficulty_correlation(slices),
         "map_cost_latency": cost_latency(conn, "mmlu", "map"),
+        # Stated in the machine-readable report too, so a consumer of map.json
+        # is not left to guess which level produced which pair of endpoints.
+        "interval_convention": {
+            "per_slice_ci": PRIMARY_INTERVAL_LABEL,
+            "per_slice_tail": 0.05,
+            "bootstrap_check": PRIMARY_INTERVAL_LABEL,
+            "bootstrap_check_tail": 0.05,
+            "difficulty_correlation": EXPLORATORY_INTERVAL_LABEL,
+            "difficulty_correlation_tail": BOOTSTRAP_TAIL,
+        },
     }
     conn.close()
     return report
+
+
+def _convention_section(report: dict) -> list[str]:
+    """
+    Which confidence level and which sidedness produced each class of interval
+    in this file and its siblings.
+
+    A one-sided 95% bound and one end of a two-sided 90% interval are the same
+    number, which is exactly why the two labels drifted apart across the repo
+    before this was written down. Stating the convention here means a reader
+    does not have to infer it from a tail parameter in the source.
+    """
+    margin_pp = report["margin"] * 100.0
+    return [
+        "\n## Interval convention\n",
+        "Quantities named in PREREGISTRATION.md report a **one-sided 95% bound at "
+        "each end**: the per-slice intervals in the map below, and the paired "
+        "bootstrap cross-check carried in map.json. Section 8 fixes that level for "
+        "both. Quantities the pre-registration does not name are post-hoc and report "
+        "a **two-sided 95% interval**: the difficulty correlation below, and the "
+        "oracle gap in reports/router.md. Nothing here is reported at a level other "
+        "than those two, and every interval in this file states which one it uses "
+        "where it appears.\n",
+        "\nBecause a one-sided 95% bound is numerically the same as one end of a "
+        "two-sided 90% interval, both bounds are printed and both get used. The "
+        "**non_inferior** verdict is read off the lower bound, which is the "
+        f"pre-registered one-sided 95% test against the {margin_pp:.0f} point margin. "
+        "The **below_margin** verdict is read off the upper bound, which is a second "
+        "one-sided 95% test in the opposite direction. Each arm is therefore at "
+        "one-sided 95%, and the three-way classifier taken as a whole is a two-sided "
+        "90% procedure. Section 7 mandates the three statuses without fixing a level "
+        "for the below-margin arm, so this is inside the pre-registration, but it is "
+        "stated here rather than left to be worked out from the code.\n",
+    ]
 
 
 def _status_distribution(report: dict) -> list[str]:
@@ -389,8 +446,11 @@ def _correlation_section(report: dict) -> list[str]:
     lines.append(
         f"Pearson correlation between hosted accuracy and delta across the "
         f"{dcorr['n_slices']} slices: r = {dcorr['r']:+.3f}, "
-        f"95% bootstrap CI [{dcorr['ci_lower']:+.3f}, {dcorr['ci_upper']:+.3f}] "
-        f"({dcorr['bootstrap_iters']:,} resamples, seed {dcorr['bootstrap_seed']}).\n")
+        f"{EXPLORATORY_INTERVAL_LABEL} bootstrap CI "
+        f"[{dcorr['ci_lower']:+.3f}, {dcorr['ci_upper']:+.3f}] "
+        f"({dcorr['bootstrap_iters']:,} resamples, seed {dcorr['bootstrap_seed']}). "
+        "Two-sided, not one-sided, because this quantity is not named in the "
+        "pre-registration and has no privileged direction to test against.\n")
     direction = ("the local model falls further behind on the slices the hosted model "
                  "also finds harder" if dcorr["r"] > 0 else
                  "the local model falls further behind on the slices the hosted model "
@@ -422,11 +482,14 @@ def write_reports(report: dict):
                      f"({dd['discordant']}/{dd['n']} items). This drives how many "
                      f"items are needed for a confident verdict.\n")
 
+    lines.extend(_convention_section(report))
+
     lines.append("\n## MMLU non-inferiority map\n")
-    lines.append("delta = local accuracy minus hosted accuracy. "
-                 "CI is the one-sided 95% bound. Verdict is at the "
+    lines.append("delta = local accuracy minus hosted accuracy. Each end of the interval "
+                 "is a one-sided 95% bound. Verdict is at the "
                  f"{report['margin']:.2f} margin.\n")
-    lines.append("\n| subject | | n | local | hosted | delta | 95% CI | verdict |")
+    lines.append(f"\n| subject | | n | local | hosted | delta | "
+                 f"{PRIMARY_INTERVAL_LABEL} | verdict |")
     lines.append("|---|---|---:|---:|---:|---:|:---:|---|")
     for s in report["map_slices"]:
         star = "P" if s.get("primary") else ""
@@ -473,7 +536,7 @@ def main() -> int:
     # Console summary
     print("Dev disagreement:",
           f"{report['dev_discordance']['rate']:.3f}" if report["dev_discordance"] else "n/a")
-    print("\nMMLU map:")
+    print(f"\nMMLU map (CI = {PRIMARY_INTERVAL_LABEL}):")
     for s in report["map_slices"]:
         if s.get("verdict") == "no_data":
             print(f"  {s['subject']:26} no data yet")

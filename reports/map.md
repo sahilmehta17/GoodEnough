@@ -5,12 +5,20 @@ Local: `unsloth/Qwen3-1.7B-GGUF:Q4_K_M`  Hosted: `llama-3.3-70b-versatile`  Marg
 Dev-set disagreement rate: 0.359 (151/421 items). This drives how many items are needed for a confident verdict.
 
 
+## Interval convention
+
+Quantities named in PREREGISTRATION.md report a **one-sided 95% bound at each end**: the per-slice intervals in the map below, and the paired bootstrap cross-check carried in map.json. Section 8 fixes that level for both. Quantities the pre-registration does not name are post-hoc and report a **two-sided 95% interval**: the difficulty correlation below, and the oracle gap in reports/router.md. Nothing here is reported at a level other than those two, and every interval in this file states which one it uses where it appears.
+
+
+Because a one-sided 95% bound is numerically the same as one end of a two-sided 90% interval, both bounds are printed and both get used. The **non_inferior** verdict is read off the lower bound, which is the pre-registered one-sided 95% test against the 10 point margin. The **below_margin** verdict is read off the upper bound, which is a second one-sided 95% test in the opposite direction. Each arm is therefore at one-sided 95%, and the three-way classifier taken as a whole is a two-sided 90% procedure. Section 7 mandates the three statuses without fixing a level for the below-margin arm, so this is inside the pre-registration, but it is stated here rather than left to be worked out from the code.
+
+
 ## MMLU non-inferiority map
 
-delta = local accuracy minus hosted accuracy. CI is the one-sided 95% bound. Verdict is at the 0.10 margin.
+delta = local accuracy minus hosted accuracy. Each end of the interval is a one-sided 95% bound. Verdict is at the 0.10 margin.
 
 
-| subject | | n | local | hosted | delta | 95% CI | verdict |
+| subject | | n | local | hosted | delta | one-sided 95% bounds | verdict |
 |---|---|---:|---:|---:|---:|:---:|---|
 | high_school_geography | P | 100 | 0.73 | 0.95 | -0.220 | [-0.239, -0.152] | **below_margin** |
 | formal_logic | P | 100 | 0.35 | 0.68 | -0.330 | [-0.396, -0.228] | **below_margin** |
@@ -73,7 +81,7 @@ These rates are reported, not corrected. The parser was frozen on the dev split 
 
 ## Difficulty and the size of the gap
 
-Pearson correlation between hosted accuracy and delta across the 8 slices: r = +0.349, 95% bootstrap CI [-0.292, +0.946] (10,000 resamples, seed 42).
+Pearson correlation between hosted accuracy and delta across the 8 slices: r = +0.349, two-sided 95% bootstrap CI [-0.292, +0.946] (10,000 resamples, seed 42). Two-sided, not one-sided, because this quantity is not named in the pre-registration and has no privileged direction to test against.
 
 
 This is underpowered. One point per slice means n = 8, and the interval is correspondingly wide and contains zero, so the correlation is not distinguishable from zero at n = 8. The sign is the direction difficulty-based routing would predict: the local model falls further behind on the slices the hosted model also finds harder. That direction is worth recording and is not evidence for the mechanism at this sample size.

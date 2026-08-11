@@ -21,7 +21,10 @@ Routing still has a cost argument: sending an item to the local model costs no m
 
 ## Oracle gap over always-hosted
 
-Oracle accuracy 0.893 minus always-hosted accuracy 0.857 = **+0.0357**, 95% paired bootstrap CI [+0.0071, +0.0714] (10,000 resamples by item, seed 42, n = 140).
+Oracle accuracy 0.893 minus always-hosted accuracy 0.857 = **+0.0357**, two-sided 95% paired bootstrap CI [+0.0071, +0.0714] (10,000 resamples by item, seed 42, n = 140).
+
+
+That interval is two-sided 95%, not the one-sided 95% used for the per-slice non-inferiority intervals in reports/map.md. The oracle gap is not named in PREREGISTRATION.md section 8; section 13 mandates it only as an upper bound and fixes no level for it. It is a post-hoc quantity with no privileged direction to test against, so it is reported two-sided. reports/map.md carries the full convention for both classes.
 
 
 The oracle needs per-item knowledge of which model is right, so it is a ceiling rather than a policy. On this model pair at this sample size, the ceiling on any routing policy is between 0.7 and 7.1 percentage points over always-hosted. The gap is reported only with that interval; the point estimate on its own is not a result.

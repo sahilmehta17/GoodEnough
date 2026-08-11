@@ -91,6 +91,20 @@ LOCAL_PRICE_OUTPUT_PER_M = 0.0
 
 
 # --------------------------------------------------------------------------
+# Build reproducibility. Not an experiment parameter: nothing here reaches a
+# model call or a reported number.
+# --------------------------------------------------------------------------
+
+# matplotlib stamps a /CreationDate into every PDF it writes, so identical
+# plotted data produced a different file on every rebuild. Exporting this as
+# SOURCE_DATE_EPOCH before the figures are written pins that stamp. The value is
+# the Day 0 freeze date, 2026-07-31T00:00:00Z, chosen because it is fixed rather
+# than because the PDFs were written then; reading the current clock would
+# defeat the point.
+SOURCE_DATE_EPOCH = "1785456000"
+
+
+# --------------------------------------------------------------------------
 # Prompt templates, identical across deployments (PREREGISTRATION.md section 10)
 # --------------------------------------------------------------------------
 

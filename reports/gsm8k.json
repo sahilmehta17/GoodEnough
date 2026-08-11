@@ -1,5 +1,5 @@
 {
-  "created_utc": "2026-08-10T17:00:32.743478+00:00",
+  "created_utc": "2026-08-11T15:59:04.675536+00:00",
   "models": {
     "local": {
       "n": 150,
@@ -8,9 +8,13 @@
       "n_incorrect": 31,
       "slope_per_step": -0.5121426337796442,
       "slope_ci": [
-        -0.7972225215959455,
-        -0.29807227015384785
+        -0.7863076778549628,
+        -0.28803895893250664
       ],
+      "slope_ci_convention": "two-sided 90%, equivalently one-sided 95% bounds",
+      "slope_ci_tail": 0.05,
+      "bootstrap_iters": 10000,
+      "bootstrap_seed": 42,
       "slope_interpretable": true,
       "slope_not_interpretable_reason": null,
       "min_minority_outcomes": 5,
@@ -60,9 +64,13 @@
       "n_incorrect": 2,
       "slope_per_step": 0.4337054037024681,
       "slope_ci": [
-        5.020624756787785e-15,
-        0.9424712854497108
+        5.470390579611283e-15,
+        0.9563973297221358
       ],
+      "slope_ci_convention": "two-sided 90%, equivalently one-sided 95% bounds",
+      "slope_ci_tail": 0.05,
+      "bootstrap_iters": 10000,
+      "bootstrap_seed": 42,
       "slope_interpretable": false,
       "slope_not_interpretable_reason": "only 2 of 150 responses fall in the rarer outcome (2 incorrect, 148 correct); below the 5-response floor the logistic fit is near separable and the slope is set by those few responses",
       "min_minority_outcomes": 5,

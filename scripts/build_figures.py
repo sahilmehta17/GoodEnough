@@ -41,7 +41,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from goodenough import analysis, loader  # noqa: E402
+from goodenough import analysis, config, loader  # noqa: E402
 
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), "..", "reports")
 FIGURES_DIR = os.path.join(REPORTS_DIR, "figures")
@@ -58,6 +58,15 @@ POLICY_COLORS = {
 
 
 def _configure_matplotlib():
+    # matplotlib writes a /CreationDate into every PDF, which made all four
+    # figures show as modified on every rebuild even when the plotted data was
+    # byte-identical. SOURCE_DATE_EPOCH pins that stamp; it is read at save
+    # time, so setting it here covers every savefig below. The value is fixed
+    # in config rather than taken from the clock, since reproducibility is the
+    # whole point. os.environ is set unconditionally so a stale value inherited
+    # from the surrounding shell cannot change the output.
+    os.environ["SOURCE_DATE_EPOCH"] = config.SOURCE_DATE_EPOCH
+
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as pyplot
@@ -67,6 +76,9 @@ def _configure_matplotlib():
         "pdf.fonttype": 42,  # embed as real text, not paths
         "axes.titlesize": 11,
         "axes.labelsize": 11,
+        # Also stamped into the PDF trailer. Pinned for the same reason.
+        "pdf.compression": 6,
+        "svg.hashsalt": "goodenough",
     })
     matplotlib.pyplot = pyplot
     return matplotlib
@@ -122,7 +134,10 @@ def render_fig1(rows: list[dict], margin_pp: float, csv_path: str, pdf_path: str
     labels = [f"{'* ' if r['is_primary'] else ''}{r['slice']}" for r in rows]
     ax.set_yticks(ys)
     ax.set_yticklabels(labels)
-    ax.set_xlabel("accuracy_local - accuracy_hosted (percentage points)")
+    # The level goes on the figure, not into the CSV column names, which stay
+    # as they are so anything already reading fig1_forest.csv keeps working.
+    ax.set_xlabel("accuracy_local - accuracy_hosted (percentage points)\n"
+                  "bars are one-sided 95% bounds at each end")
     ax.margins(y=0.05)
     fig.tight_layout()
     fig.savefig(pdf_path, bbox_inches="tight")

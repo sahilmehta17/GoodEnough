@@ -1,5 +1,5 @@
 {
-  "created_utc": "2026-08-10T17:00:32.136760+00:00",
+  "created_utc": "2026-08-11T15:59:04.139229+00:00",
   "margin": 0.1,
   "sensitivity_margins": [
     0.05,
@@ -367,6 +367,8 @@
     "r": 0.3491277988851995,
     "ci_lower": -0.2923458710550984,
     "ci_upper": 0.9462731372068204,
+    "ci_convention": "two-sided 95%",
+    "ci_tail": 0.025,
     "n_slices": 8,
     "bootstrap_iters": 10000,
     "bootstrap_seed": 42,
@@ -386,5 +388,13 @@
       "latency_ms_mean": 543.9396674998716,
       "total_tokens": 184529
     }
+  },
+  "interval_convention": {
+    "per_slice_ci": "one-sided 95% bounds",
+    "per_slice_tail": 0.05,
+    "bootstrap_check": "one-sided 95% bounds",
+    "bootstrap_check_tail": 0.05,
+    "difficulty_correlation": "two-sided 95%",
+    "difficulty_correlation_tail": 0.025
   }
 }

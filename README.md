@@ -4,7 +4,7 @@
 
 On none of the eight slices does the local model establish non-inferiority at the 10-point margin. Five fall below the margin. Three are inconclusive at n = 100, meaning the data cannot decide them in either direction. Local is `unsloth/Qwen3-1.7B-GGUF` Q4_K_M on a consumer CPU, hosted is Groq `llama-3.3-70b-versatile`, 100 paired items per slice, margin fixed before any data was collected.
 
-| subject | | n | local | hosted | delta | one-sided 95% CI | verdict |
+| subject | | n | local | hosted | delta | one-sided 95% bounds | verdict |
 |---|---|---:|---:|---:|---:|:---:|---|
 | high_school_geography | P | 100 | 0.73 | 0.95 | -0.220 | [-0.239, -0.152] | below_margin |
 | formal_logic | P | 100 | 0.35 | 0.68 | -0.330 | [-0.396, -0.228] | below_margin |
@@ -15,7 +15,9 @@ On none of the eight slices does the local model establish non-inferiority at th
 | professional_law |  | 100 | 0.35 | 0.64 | -0.290 | [-0.377, -0.175] | below_margin |
 | high_school_psychology |  | 100 | 0.80 | 0.92 | -0.120 | [-0.179, -0.035] | inconclusive |
 
-`delta` is local accuracy minus hosted accuracy. P marks the two primary slices named before the pilot. The pre-registered claim was that at least one primary slice would clear the margin. Both primary slices land below it, which is the outcome [PREREGISTRATION.md](PREREGISTRATION.md) section 15 named in advance as publishable. The three inconclusive slices are not counted against the model: the interval spans the margin there, so the study has no verdict on them either way.
+`delta` is local accuracy minus hosted accuracy, and each end of the interval is a one-sided 95% bound. P marks the two primary slices named before the pilot. The pre-registered claim was that at least one primary slice would clear the margin. Both primary slices land below it, which is the outcome [PREREGISTRATION.md](PREREGISTRATION.md) section 15 named in advance as publishable. The three inconclusive slices are not counted against the model: the interval spans the margin there, so the study has no verdict on them either way.
+
+Two confidence-interval conventions are used and every reported interval says which. Quantities named in the pre-registration report a one-sided 95% bound at each end, the level section 8 fixes. Post-hoc quantities the pre-registration does not name report a two-sided 95% interval. [reports/map.md](reports/map.md) states the convention in full, including which bound each of the three verdicts is read off.
 
 ```bash
 python scripts/build_map.py && python scripts/build_gsm8k.py && python scripts/build_router.py && python scripts/build_cost.py && python scripts/build_figures.py
@@ -27,14 +29,14 @@ That rebuilds every table and figure in `reports/` from `data/results.sqlite`. T
 
 **5 of 140.** On the held-out router split, 5 items had the local model right and the hosted model wrong. 50 went the other way, 70 both models answered correctly, 15 neither did. Those 5 items are the whole accuracy budget any routing policy has to work with here. Full breakdown in [reports/router.md](reports/router.md).
 
-**Oracle gap +0.0357, 95% CI [+0.0071, +0.0714].** A router with per-item knowledge of which model is right beats always-hosted by between 0.7 and 7.1 percentage points on this model pair at this sample size. That is a ceiling, not a policy: none of the four deployable policies evaluated here reaches it. Paired bootstrap, 10,000 resamples by item, seed 42.
+**Oracle gap +0.0357, two-sided 95% CI [+0.0071, +0.0714].** A router with per-item knowledge of which model is right beats always-hosted by between 0.7 and 7.1 percentage points on this model pair at this sample size. That is a ceiling, not a policy: none of the four deployable policies evaluated here reaches it. Paired bootstrap, 10,000 resamples by item, seed 42. Two-sided because the oracle gap is post-hoc and has no privileged direction, unlike the per-slice intervals above.
 
 **Total study cost: $0.2550 hosted list-price-equivalent and 10,362.9 seconds of local machine occupancy.** Those two are measured: 383,004 tokens passed through the hosted model, and $0.2550 is what they would have cost at Groq's published on-demand rate. No cash actually left an account, because collection ran under Groq's free tier, and local inference calls no metered API. Both of those zeros follow from how the study was billed rather than from anything counted, so [reports/cost.md](reports/cost.md) reports them separately from the measurements.
 
 ## What else is in reports/
 
 - [reports/map.md](reports/map.md): the map above, plus verdicts at 5 and 15 point margins, unparseable rate per subject per model, and the correlation between slice difficulty and the size of the gap.
-- [reports/gsm8k.md](reports/gsm8k.md): accuracy against gold reasoning-step count. The local slope is -0.512, 90% CI [-0.797, -0.298]. No hosted slope is reported: hosted made 2 errors in 150 items, too few to estimate one.
+- [reports/gsm8k.md](reports/gsm8k.md): accuracy against gold reasoning-step count. The local slope is -0.512, CI [-0.786, -0.288], two-sided 90% and equivalently one-sided 95% bounds, from 10,000 resamples at seed 42. No hosted slope is reported: hosted made 2 errors in 150 items, too few to estimate one.
 - [reports/router.md](reports/router.md): item-level breakdown, oracle gap, and five routing policies on the held-out split.
 - [reports/cost.md](reports/cost.md): the four cost quantities, the latency inversion, and per-policy dollars and wall-clock seconds.
 - [reports/figures/](reports/figures/): four paper figures, each emitted as a CSV and a vector PDF.

@@ -3,9 +3,13 @@
 How each model's accuracy falls as a problem needs more reasoning steps.
 Slope is the change in log-odds of a correct answer per extra step; a more negative slope means faster degradation.
 
-| model | n | correct | incorrect | overall acc | slope per step | 90% CI |
+
+**Interval convention.** Each slope interval below is two-sided 90%, equivalently one-sided 95% bounds. Those are two descriptions of one computation, not two computations: the bootstrap takes the 5% and 95% percentiles of the resampled slopes, so each end is a one-sided 95% bound and the pair spans a two-sided 90% interval. The one-sided reading is the level PREREGISTRATION.md section 8 fixes. 10,000 resamples by item, seed 42.
+
+
+| model | n | correct | incorrect | overall acc | slope per step | two-sided 90% CI |
 |---|---:|---:|---:|---:|---:|:---:|
-| local | 150 | 119 | 31 | 0.79 | -0.512 | [-0.797, -0.298] |
+| local | 150 | 119 | 31 | 0.79 | -0.512 | [-0.786, -0.288] |
 | hosted | 150 | 148 | 2 | 0.99 | not estimable | not estimable |
 
 No slope is reported for hosted. It answered 148 of 150 items correctly (accuracy 0.99), leaving 2 errors across the whole split. That is too few errors to estimate how accuracy changes with step count: the logistic fit is near separable, so any slope it produces is set by those 2 responses and its interval runs to a boundary. The floor used here is 5 responses in the rarer outcome, applied to both models. The fitted value is kept in reports/gsm8k.json flagged `slope_interpretable: false`, and it should not be read as an estimate.
