@@ -14,3 +14,8 @@ models/
 CURSOR_HANDOFF.md
 docs/superpowers/
 .cursor/
+
+# Paper source pulled from Overleaf for cross-checking. Never committed: the
+# repo is public under the author's name and the submission is double-blind.
+paper_main.tex
+paper_references.bib
