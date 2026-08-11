@@ -140,6 +140,6 @@ The map-based router may route almost everything hosted. At 1.7B versus 70B with
 
 ## Tone for the README
 
-Narrow and defensible. This is a case study of two pinned deployment configurations, not a new routing method. Cite FrugalGPT (arXiv 2305.05176), RouteLLM (arXiv 2406.18665), LLMRouterBench (arXiv 2601.07206), and the 2026 routing survey (arXiv 2603.04445). Note explicitly that RouteLLM trained partly on MMLU with gold labels, so this benchmark choice sits inside their evaluation domain.
+Narrow and defensible. This is a case study of two pinned deployment configurations, not a new routing method. Cite FrugalGPT (arXiv 2305.05176), RouteLLM (arXiv 2406.18665), RouterBench (arXiv 2403.12031), LLMRouterBench (arXiv 2601.07206), and the 2026 routing survey (arXiv 2603.04445). RouterBench and LLMRouterBench are two different papers with similar names, not duplicates; keep both. Every one of these five IDs was fetched and verified on 11 August 2026. Note explicitly that RouteLLM trained partly on MMLU with gold labels, so this benchmark choice sits inside their evaluation domain.
 
 The contribution: nobody in that literature benchmarks a quantized consumer-CPU deployment with measured wall-clock latency on the actual machine. That part is ours. Nothing more.

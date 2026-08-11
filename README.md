@@ -142,4 +142,4 @@ MIT. See [LICENSE](LICENSE).
 
 ## Prior art
 
-Model routing and cascades are well studied: [FrugalGPT](https://arxiv.org/abs/2305.05176), [RouteLLM](https://arxiv.org/abs/2406.18665) (which trains partly on MMLU), and the [LLMRouterBench](https://arxiv.org/abs/2601.07206) benchmark. What that literature does not do is measure a quantized consumer-CPU deployment against a hosted reference with real wall-clock latency on the actual machine. That measurement is the contribution here.
+Model routing and cascades are well studied: [FrugalGPT](https://arxiv.org/abs/2305.05176), [RouteLLM](https://arxiv.org/abs/2406.18665) (which trains partly on MMLU), and the [RouterBench](https://arxiv.org/abs/2403.12031) and [LLMRouterBench](https://arxiv.org/abs/2601.07206) benchmarks. What that literature does not do is measure a quantized consumer-CPU deployment against a hosted reference with real wall-clock latency on the actual machine. That measurement is the contribution here.
